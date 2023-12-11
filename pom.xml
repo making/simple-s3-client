@@ -62,6 +62,7 @@
 			<groupId>org.zalando</groupId>
 			<artifactId>logbook-spring</artifactId>
 			<version>3.7.1</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
