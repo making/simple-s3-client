@@ -128,7 +128,7 @@ public class S3Client {
 		AmzDate amzDate = new AmzDate(this.clock.instant());
 		String contentSha256 = content == null ? UNSIGNED_PAYLOAD : encodeHex(sha256Hash(content));
 		TreeMap<String, String> headers = new TreeMap<>();
-		headers.put(HttpHeaders.HOST, this.host());
+		headers.put(HttpHeaders.HOST,  this.endpoint.getHost());
 		headers.put(AmzHttpHeaders.X_AMZ_CONTENT_SHA256, contentSha256);
 		headers.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
 		if (content != null) {
@@ -213,10 +213,6 @@ public class S3Client {
 		byte[] kService = hmacSHA256("s3", kRegion);
 		byte[] kSigning = hmacSHA256("aws4_request", kService);
 		return encodeHex(hmacSHA256(stringToSign, kSigning));
-	}
-
-	private String host() {
-		return this.endpoint.toString().replace("https://", "").replace("http://", "");
 	}
 
 	public void setClock(Clock clock) {
