@@ -4,18 +4,18 @@
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>am.ik.template</groupId>
-	<artifactId>java-lib</artifactId>
-	<version>0.1.1-SNAPSHOT</version>
-	<name>java-lib</name>
-	<description>A Java library template</description>
+	<groupId>am.ik.s3</groupId>
+	<artifactId>simple-s3-client</artifactId>
+	<version>0.1.0-SNAPSHOT</version>
+	<name>simple-s3-client</name>
+	<description>A simple S3 Java Client that only uses RestTemplate and Jackson</description>
 
 	<properties>
 		<java.version>17</java.version>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<spring-boot.version>3.1.2</spring-boot.version>
+		<spring-boot.version>3.1.6</spring-boot.version>
 	</properties>
 	<licenses>
 		<license>
@@ -25,12 +25,12 @@
 		</license>
 	</licenses>
 	<scm>
-		<url>https://github.com/making/java-lib</url>
-		<connection>scm:git:git@github.com:making/java-lib.git</connection>
-		<developerConnection>scm:git:git@github.com:making/java-lib.git
+		<url>https://github.com/making/simple-s3-client</url>
+		<connection>scm:git:git@github.com:making/simple-s3-client.git</connection>
+		<developerConnection>scm:git:git@github.com:making/simple-s3-client.git
 		</developerConnection>
 	</scm>
-	<url>https://github.com/making/java-lib</url>
+	<url>https://github.com/making/simple-s3-client</url>
 
 	<developers>
 		<developer>
@@ -42,8 +42,30 @@
 	</developers>
 	<dependencies>
 		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-xml</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.zalando</groupId>
+			<artifactId>logbook-spring</artifactId>
+			<version>3.7.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -58,6 +80,21 @@
 		<dependency>
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>localstack</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
