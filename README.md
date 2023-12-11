@@ -16,5 +16,5 @@ S3Client s3Client = new S3Client(this.restTemplate, URI.create(endpoint), region
 
 s3Client.putObject("test", "foo.txt", new ClassPathResource("foo.txt"), MediaType.TEXT_PLAIN);
 
-byte[] content = s3Client.putObject("test", "foo.txt");
+byte[] content = s3Client.getObject("test", "foo.txt");
 ```
