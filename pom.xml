@@ -6,7 +6,7 @@
 
 	<groupId>am.ik.s3</groupId>
 	<artifactId>simple-s3-client</artifactId>
-	<version>0.1.0</version>
+	<version>0.1.1-SNAPSHOT</version>
 	<name>simple-s3-client</name>
 	<description>A simple S3 Java Client that only uses RestTemplate and Jackson</description>
 
