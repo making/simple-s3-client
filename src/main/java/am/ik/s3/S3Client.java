@@ -128,7 +128,7 @@ public class S3Client {
 		AmzDate amzDate = new AmzDate(this.clock.instant());
 		String contentSha256 = content == null ? UNSIGNED_PAYLOAD : encodeHex(sha256Hash(content));
 		TreeMap<String, String> headers = new TreeMap<>();
-		headers.put(HttpHeaders.HOST,  this.endpoint.getHost());
+		headers.put(HttpHeaders.HOST, this.endpoint.getHost());
 		headers.put(AmzHttpHeaders.X_AMZ_CONTENT_SHA256, contentSha256);
 		headers.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
 		if (content != null) {
