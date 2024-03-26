@@ -6,7 +6,7 @@
 
 	<groupId>am.ik.s3</groupId>
 	<artifactId>simple-s3-client</artifactId>
-	<version>0.2.0</version>
+	<version>0.2.0-SNAPSHOT</version>
 	<name>simple-s3-client</name>
 	<description>A simple S3 Java Client that only uses RestTemplate and Jackson</description>
 
@@ -108,6 +108,14 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<configuration>
+					<sourcepath>${project.basedir}/src/main/java;${project.basedir}/target/generated-sources/annotations</sourcepath>
+				</configuration>
+				<version>3.6.3</version>
 			</plugin>
 			<plugin>
 				<groupId>io.spring.javaformat</groupId>

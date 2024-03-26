@@ -25,8 +25,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.RequestEntity;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import static am.ik.s3.S3RequestBuilder.s3Request;
-
 public final class S3Request {
 
 	private final URI endpoint;
