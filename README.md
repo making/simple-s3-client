@@ -17,10 +17,10 @@ Make sure the `RestTemplate` has `MappingJackson2XmlHttpMessageConverter` to con
 
 ```java
 URI endpoint = URI.create("https://...");
-		String region = "...";
-		String accessKeyId = "...";
-		String secretAccessKey = "...";
-		String bucket = "...";
+String region = "...";
+String accessKeyId = "...";
+String secretAccessKey = "...";
+String bucket = "...";
 
 S3Request putBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
