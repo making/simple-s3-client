@@ -84,7 +84,6 @@ jobs:
         </settings>
         EOF
         mvn -V \
-            javadoc:jar \
             source:jar \
             package \
             org.apache.maven.plugins:maven-gpg-plugin:3.0.1:sign \
