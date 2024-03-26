@@ -1,10 +1,7 @@
 package am.ik.s3;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
-import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 
 public record S3Content(byte[] body, MediaType mediaType) {
