@@ -184,18 +184,4 @@ public final class S3Request {
 				+ '\'' + ", method=" + method + ", canonicalUri='" + canonicalUri + '\'' + ", canonicalQueryString='"
 				+ canonicalQueryString + '\'' + '}';
 	}
-
-	public static void main(String[] args) {
-		RequestEntity<Void> request = s3Request().endpoint(URI.create("https://example.com"))
-			.region("tokyo")
-			.accessKeyId("mybucket")
-			.secretAccessKey("bb")
-			.method(HttpMethod.POST)
-			.path(b -> b.bucket("test").key("foo.txt"))
-			.build()
-			.toEntityBuilder()
-			.build();
-		System.out.println(request);
-	}
-
 }
