@@ -16,12 +16,16 @@ Make sure the `RestTemplate` has `MappingJackson2XmlHttpMessageConverter` to con
 
 
 ```java
+import static am.ik.s3.S3RequestBuilder.s3Request;
+
 URI endpoint = URI.create("https://...");
 String region = "...";
 String accessKeyId = "...";
 String secretAccessKey = "...";
 String bucket = "...";
+RestTemplate restTempalte = ...;
 
+// Put a bucket
 S3Request putBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -31,6 +35,7 @@ S3Request putBucketRequest = s3Request().endpoint(endpoint)
 	.build();
 restTemplate.exchange(putBucketRequest.toEntityBuilder().build(), Void.class);
 
+// List buckets
 S3Request listBucketsRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -43,6 +48,7 @@ ListBucketsResult bucketsResult = restTemplate
 	.getBody();
 System.out.println(bucketsResult);
 
+// Put an object
 String body = "Hello World!";
 S3Request putObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
@@ -54,6 +60,7 @@ S3Request putObjectRequest = s3Request().endpoint(endpoint)
 	.build();
 restTemplate.exchange(putObjectRequest.toEntityBuilder().body(body), Void.class);
 
+// List a bucket
 S3Request listBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -66,6 +73,7 @@ ListBucketResult bucketResult = restTemplate
 	.getBody();
 System.out.println(bucketResult);
 
+// Get an object
 S3Request getObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -76,6 +84,7 @@ S3Request getObjectRequest = s3Request().endpoint(endpoint)
 String response = restTemplate.exchange(getObjectRequest.toEntityBuilder().build(), String.class).getBody();
 System.out.println("Response: " + response); // Response: Hello World!
 
+// Delete an object
 S3Request deleteObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -85,6 +94,7 @@ S3Request deleteObjectRequest = s3Request().endpoint(endpoint)
 	.build();
 restTemplate.exchange(deleteObjectRequest.toEntityBuilder().build(), Void.class);
 
+// Delete a bucket
 S3Request deleteBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -100,12 +110,16 @@ restTemplate.exchange(deleteBucketRequest.toEntityBuilder().build(), Void.class)
 Make sure the `RestClient` has `MappingJackson2XmlHttpMessageConverter` to convert XML responses.
 
 ```java
+import static am.ik.s3.S3RequestBuilder.s3Request;
+
 URI endpoint = URI.create("https://...");
 String region = "...";
 String accessKeyId = "...";
 String secretAccessKey = "...";
 String bucket = "...";
+RestClient restClient = ...;
 
+// Put a bucket
 S3Request putBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -115,6 +129,7 @@ S3Request putBucketRequest = s3Request().endpoint(endpoint)
 	.build();
 restClient.put().uri(putBucketRequest.uri()).headers(putBucketRequest.headers()).retrieve().toBodilessEntity();
 
+// List buckets
 S3Request listBucketsRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -129,6 +144,7 @@ ListBucketsResult bucketsResult = restClient.get()
 	.body(ListBucketsResult.class);
 System.out.println(bucketsResult);
 
+// Put an object
 String body = "Hello World!";
 S3Request putObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
@@ -145,6 +161,7 @@ restClient.put()
 	.retrieve()
 	.toBodilessEntity();
 
+// List a bucket
 S3Request listBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -159,6 +176,7 @@ ListBucketResult bucketResult = restClient.get()
 	.body(ListBucketResult.class);
 System.out.println(bucketResult);
 
+// Get an object
 S3Request getObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -173,6 +191,7 @@ String response = restClient.get()
 	.body(String.class);
 System.out.println("Response: " + response); // Response: Hello World!
 
+// Delete an object
 S3Request deleteObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -186,6 +205,7 @@ restClient.delete()
 	.retrieve()
 	.toBodilessEntity();
 
+// Delete a bucket
 S3Request deleteBucketRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
