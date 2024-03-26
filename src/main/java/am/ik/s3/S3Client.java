@@ -27,6 +27,10 @@ import org.springframework.web.client.RestTemplate;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
+/**
+ * Consider using {@link S3Request} instead.
+ */
+@Deprecated(since = "0.2.0", forRemoval = true)
 public class S3Client {
 
 	private final RestTemplate restTemplate;

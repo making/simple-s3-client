@@ -184,4 +184,5 @@ public final class S3Request {
 				+ '\'' + ", method=" + method + ", canonicalUri='" + canonicalUri + '\'' + ", canonicalQueryString='"
 				+ canonicalQueryString + '\'' + '}';
 	}
+
 }
