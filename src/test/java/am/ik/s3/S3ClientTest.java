@@ -47,7 +47,8 @@ class S3ClientTest {
 	@BeforeEach
 	void setup() {
 		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.getInterceptors().add(new LogbookClientHttpRequestInterceptor(Logbook.builder().build()));
+		restTemplate.getInterceptors()
+			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
 		this.s3Client = new S3Client(restTemplate, localstack.getEndpoint(), localstack.getRegion(),
 				localstack.getAccessKey(), localstack.getSecretKey());
 	}
