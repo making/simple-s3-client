@@ -69,7 +69,6 @@ public final class S3Path {
 		return encodedKey.replace("!", "%21")
 			.replace("#", "%23")
 			.replace("$", "%24")
-			.replace("%", "%25")
 			.replace("&", "%26")
 			.replace("'", "%27")
 			.replace("(", "%28")
