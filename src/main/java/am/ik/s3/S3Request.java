@@ -88,7 +88,11 @@ public final class S3Request {
 		AmzDate amzDate = new AmzDate(this.clock.instant());
 		String contentSha256 = content == null ? UNSIGNED_PAYLOAD : encodeHex(sha256Hash(content.body()));
 		TreeMap<String, String> headers = new TreeMap<>();
-		headers.put(HttpHeaders.HOST, this.endpoint.getHost());
+		StringBuilder host = new StringBuilder(this.endpoint.getHost());
+		if (this.endpoint.getPort() != -1) {
+			host.append(":").append(this.endpoint.getPort());
+		}
+		headers.put(HttpHeaders.HOST, host.toString());
 		headers.put(AmzHttpHeaders.X_AMZ_CONTENT_SHA256, contentSha256);
 		headers.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
 		if (content != null && content.body() != null) {
