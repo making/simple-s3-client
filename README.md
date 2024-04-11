@@ -6,7 +6,7 @@ A simple S3 Java Client that works with Spring `RestTemplate` or `RestClient`
 		<dependency>
 			<groupId>am.ik.s3</groupId>
 			<artifactId>simple-s3-client</artifactId>
-			<version>0.2.0</version>
+			<version>0.2.1</version>
 		</dependency>
 ```
 
