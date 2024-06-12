@@ -18,6 +18,8 @@ package am.ik.s3;
 import java.net.URI;
 import java.util.UUID;
 
+import am.ik.spring.logbook.AccessLoggerSink;
+import am.ik.spring.logbook.OpinionatedFilters;
 import org.zalando.logbook.Logbook;
 import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
@@ -32,7 +34,10 @@ public class ReadMeRestTemplate {
 	public static void main(String[] args) {
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
+			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder()
+				.sink(new AccessLoggerSink())
+				.headerFilter(OpinionatedFilters.headerFilter())
+				.build()));
 
 		URI endpoint = URI.create("https://play.min.io");
 		String region = "us-east-1";

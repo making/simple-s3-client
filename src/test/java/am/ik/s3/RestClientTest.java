@@ -17,6 +17,8 @@ package am.ik.s3;
 
 import java.util.List;
 
+import am.ik.spring.logbook.AccessLoggerSink;
+import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -51,8 +53,10 @@ class RestClientTest {
 	@BeforeEach
 	void setup() {
 		this.restClient = RestClient.builder()
-			.requestInterceptor(
-					new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()))
+			.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
+				.sink(new AccessLoggerSink())
+				.headerFilter(OpinionatedFilters.headerFilter())
+				.build()))
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 			.build();
 	}

@@ -18,6 +18,8 @@ package am.ik.s3;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import am.ik.spring.logbook.AccessLoggerSink;
+import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -48,7 +50,10 @@ class S3ClientTest {
 	void setup() {
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
+			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder()
+				.sink(new AccessLoggerSink())
+				.headerFilter(OpinionatedFilters.headerFilter())
+				.build()));
 		this.s3Client = new S3Client(restTemplate, localstack.getEndpoint(), localstack.getRegion(),
 				localstack.getAccessKey(), localstack.getSecretKey());
 	}

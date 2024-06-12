@@ -17,6 +17,8 @@ package am.ik.s3;
 
 import java.util.List;
 
+import am.ik.spring.logbook.AccessLoggerSink;
+import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -53,7 +55,10 @@ class RestTemplateTest {
 	void setup() {
 		this.restTemplate = new RestTemplate();
 		this.restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
+			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder()
+				.sink(new AccessLoggerSink())
+				.headerFilter(OpinionatedFilters.headerFilter())
+				.build()));
 	}
 
 	private S3RequestBuilders.Method partialS3Request() {
