@@ -121,7 +121,7 @@
 				<configuration>
 					<sourcepath>${project.basedir}/src/main/java;${project.basedir}/target/generated-sources/annotations</sourcepath>
 				</configuration>
-				<version>3.6.3</version>
+				<version>3.7.0</version>
 			</plugin>
 			<plugin>
 				<groupId>io.spring.javaformat</groupId>
