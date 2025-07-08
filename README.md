@@ -2,15 +2,65 @@
 
 A simple S3 Java Client that works with Spring `RestTemplate` or `RestClient`
 
+This library provides two ways to interact with S3:
+1. **Low-level API** using `S3Request` with `RestTemplate` or `RestClient`
+2. **Fluent API** using `S3Client` (Recommended for new projects)
+
 ```xml
 		<dependency>
 			<groupId>am.ik.s3</groupId>
 			<artifactId>simple-s3-client</artifactId>
-			<version>0.2.2</version>
+			<version>0.2.3</version>
 		</dependency>
 ```
 
-## Examples with `RestTemplate`
+## Examples with `S3Client` (Recommended)
+
+The `S3Client` provides a modern, fluent API for S3 operations with method chaining.
+
+```java
+// Create client with default RestClient configuration
+S3Client client = S3Client.builder()
+    .endpoint("https://s3.amazonaws.com")
+    .region("us-east-1")
+    .credentials("accessKeyId", "secretAccessKey")
+    .build();
+
+// Or use custom RestClient
+RestClient customRestClient = RestClient.builder()
+    .messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
+    .build();
+
+S3Client client = S3Client.builder()
+    .endpoint("https://s3.amazonaws.com")
+    .region("us-east-1")
+    .credentials("accessKeyId", "secretAccessKey")
+    .restClient(customRestClient)
+    .build();
+
+// Bucket operations
+client.bucket("my-bucket").create();
+ListBucketsResult buckets = client.listBuckets();
+System.out.println(buckets);
+ListBucketResult objects = client.bucket("my-bucket").listObjects();
+System.out.println(objects);
+
+// Object operations
+client.bucket("my-bucket").object("hello.txt").put("Hello World!");
+client.bucket("my-bucket").object("test.png").put(imageBytes, MediaType.IMAGE_PNG);
+
+String content = client.bucket("my-bucket").object("hello.txt").get();
+System.out.println("Content: " + content); // Content: Hello World!
+
+byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
+
+// Clean up
+client.bucket("my-bucket").object("hello.txt").delete();
+client.bucket("my-bucket").object("test.png").delete();
+client.bucket("my-bucket").delete();
+```
+
+## Examples with `RestTemplate` (Low-level API)
 
 Make sure the `RestTemplate` has `MappingJackson2XmlHttpMessageConverter` to convert XML responses.
 
@@ -105,7 +155,7 @@ S3Request deleteBucketRequest = s3Request().endpoint(endpoint)
 restTemplate.exchange(deleteBucketRequest.toEntityBuilder().build(), Void.class);
 ```
 
-## Examples with `RestClient`
+## Examples with `RestClient` (Low-level API)
 
 Make sure the `RestClient` has `MappingJackson2XmlHttpMessageConverter` to convert XML responses.
 
@@ -219,3 +269,46 @@ restClient.delete()
 	.retrieve()
 	.toBodilessEntity();
 ```
+
+## API Overview
+
+### S3Client
+
+#### Client Creation
+- `S3Client.builder()` - Start building a client
+- `.endpoint(String)` - Set S3 endpoint URL
+- `.region(String)` - Set AWS region
+- `.credentials(String accessKeyId, String secretAccessKey)` - Set AWS credentials
+- `.restClient(RestClient)` - Use custom RestClient (optional)
+- `.build()` - Create the client
+
+#### Bucket Operations
+- `client.listBuckets()` - List all buckets
+- `client.bucket(String name)` - Select a bucket for operations
+- `.create()` - Create the bucket
+- `.delete()` - Delete the bucket
+- `.listObjects()` - List objects in the bucket
+
+#### Object Operations
+- `client.bucket(String).object(String key)` - Select an object for operations
+- `.put(String content)` - Upload string content as text/plain
+- `.put(String content, MediaType mediaType)` - Upload string with specific media type
+- `.put(byte[] content)` - Upload binary content as application/octet-stream
+- `.put(byte[] content, MediaType mediaType)` - Upload binary with specific media type
+- `.get()` - Download as string
+- `.getAsBytes()` - Download as byte array
+- `.delete()` - Delete the object
+
+### When to Use Which API
+
+**Use S3Client when:**
+- Building new applications
+- You want a modern, intuitive API
+- You prefer method chaining
+- You need type safety and compile-time validation
+
+**Use S3Request (low-level API) when:**
+- You need fine-grained control over HTTP requests
+- Working with existing code that uses S3Request
+- Building custom abstractions on top of the library
+- You need to access advanced S3 features not covered by S3Client

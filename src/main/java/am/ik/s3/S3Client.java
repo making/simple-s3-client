@@ -1,167 +1,168 @@
-/*
- * Copyright (C) 2023 Toshiaki Maki <makingx@gmail.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package am.ik.s3;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
+import org.springframework.web.client.RestClient;
+
 import java.net.URI;
-
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.RequestEntity;
-import org.springframework.web.client.RestTemplate;
-
-import static am.ik.s3.S3RequestBuilder.s3Request;
+import java.util.List;
 
 /**
- * Consider using {@link S3Request} instead.
+ * S3 client providing chainable methods for S3 operations. This client uses RestClient
+ * internally and provides type-safe operations for common S3 tasks.
+ *
+ * <p>
+ * Example usage: <pre>{@code
+ * S3Client client = S3Client.builder()
+ *     .endpoint("https://s3.amazonaws.com")
+ *     .region("us-east-1")
+ *     .credentials("accessKey", "secretKey")
+ *     .build();
+ *
+ * // Create bucket
+ * client.bucket("my-bucket").create();
+ *
+ * // Upload object
+ * client.bucket("my-bucket").object("file.txt").put("content");
+ *
+ * // Download object
+ * String content = client.bucket("my-bucket").object("file.txt").get();
+ * }</pre>
+ *
+ * @since 0.3.0
  */
-@Deprecated(since = "0.2.0", forRemoval = true)
-public class S3Client {
+public final class S3Client {
 
-	private final RestTemplate restTemplate;
+	private final S3OperationBuilder operationBuilder;
 
-	private final URI endpoint;
-
-	private final String region;
-
-	private final String accessKeyId;
-
-	private final String secretAccessKey;
-
-	public S3Client(RestTemplate restTemplate, URI endpoint, String region, String accessKeyId,
-			String secretAccessKey) {
-		this.restTemplate = restTemplate;
-		this.endpoint = endpoint;
-		this.region = region;
-		this.accessKeyId = accessKeyId;
-		this.secretAccessKey = secretAccessKey;
+	/**
+	 * Private constructor. Use builder() to create instances.
+	 * @param restClient The RestClient instance to use
+	 * @param configuration The S3 client configuration
+	 */
+	private S3Client(RestClient restClient, S3ClientConfiguration configuration) {
+		this.operationBuilder = new S3OperationBuilder(restClient, configuration);
 	}
 
+	/**
+	 * Creates a new S3Client builder.
+	 * @return A new S3ClientBuilder instance
+	 */
+	public static S3ClientBuilder builder() {
+		return new S3ClientBuilder();
+	}
+
+	/**
+	 * Creates a bucket operation builder.
+	 * @param bucketName The name of the bucket
+	 * @return A BucketOperationBuilder for the specified bucket
+	 */
+	public S3OperationBuilder.BucketOperationBuilder bucket(String bucketName) {
+		return operationBuilder.bucket(bucketName);
+	}
+
+	/**
+	 * Lists all buckets.
+	 * @return ListBucketsResult containing all buckets
+	 */
 	public ListBucketsResult listBuckets() {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
-			.path(b -> b)
-			.build()
-			.toEntityBuilder()
-			.build();
-		return this.restTemplate.exchange(request, ListBucketsResult.class).getBody();
+		return operationBuilder.listBuckets();
 	}
 
-	public ListBucketResult listBucket(String bucket) {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
-			.path(b -> b.bucket(bucket))
-			.build()
-			.toEntityBuilder()
-			.build();
-		return this.restTemplate.exchange(request, ListBucketResult.class).getBody();
-	}
+	/**
+	 * Builder class for creating S3Client instances.
+	 */
+	public static final class S3ClientBuilder {
 
-	public void deleteBucket(String bucket) {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.DELETE)
-			.path(b -> b.bucket(bucket))
-			.build()
-			.toEntityBuilder()
-			.build();
-		this.restTemplate.exchange(request, String.class);
-	}
+		private URI endpoint;
 
-	public void putBucket(String bucket) {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.PUT)
-			.path(b -> b.bucket(bucket))
-			.build()
-			.toEntityBuilder()
-			.build();
-		this.restTemplate.exchange(request, String.class);
-	}
+		private String region;
 
-	public void putObject(String bucket, String key, byte[] content, MediaType mediaType) {
-		RequestEntity<byte[]> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.PUT)
-			.path(b -> b.bucket(bucket).key(key))
-			.content(S3Content.of(content, mediaType))
-			.build()
-			.toEntityBuilder()
-			.body(content);
-		this.restTemplate.exchange(request, Void.class);
-	}
+		private String accessKeyId;
 
-	public void putObject(String bucket, String key, Resource resource, MediaType mediaType) {
-		try {
-			byte[] body = resource.getContentAsByteArray();
-			RequestEntity<byte[]> request = s3Request().endpoint(this.endpoint)
-				.region(this.region)
-				.accessKeyId(this.accessKeyId)
-				.secretAccessKey(this.secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucket).key(key))
-				.content(S3Content.of(body, mediaType))
-				.build()
-				.toEntityBuilder()
-				.body(body);
-			this.restTemplate.exchange(request, Void.class);
+		private String secretAccessKey;
+
+		private RestClient restClient;
+
+		private S3ClientBuilder() {
 		}
-		catch (IOException e) {
-			throw new UncheckedIOException(e);
+
+		/**
+		 * Sets the S3 endpoint URI.
+		 * @param endpoint The S3 endpoint URI
+		 * @return This builder instance
+		 */
+		public S3ClientBuilder endpoint(URI endpoint) {
+			this.endpoint = endpoint;
+			return this;
 		}
-	}
 
-	public byte[] getObject(String bucket, String key) {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
-			.path(b -> b.bucket(bucket).key(key))
-			.build()
-			.toEntityBuilder()
-			.build();
-		return this.restTemplate.exchange(request, byte[].class).getBody();
-	}
+		/**
+		 * Sets the S3 endpoint URL.
+		 * @param endpoint The S3 endpoint URL
+		 * @return This builder instance
+		 */
+		public S3ClientBuilder endpoint(String endpoint) {
+			return endpoint(URI.create(endpoint));
+		}
 
-	public void deleteObject(String bucket, String key) {
-		RequestEntity<Void> request = s3Request().endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.DELETE)
-			.path(b -> b.bucket(bucket).key(key))
-			.build()
-			.toEntityBuilder()
-			.build();
-		this.restTemplate.exchange(request, Void.class);
+		/**
+		 * Sets the AWS region.
+		 * @param region The AWS region
+		 * @return This builder instance
+		 */
+		public S3ClientBuilder region(String region) {
+			this.region = region;
+			return this;
+		}
+
+		/**
+		 * Sets the AWS credentials.
+		 * @param accessKeyId The AWS access key ID
+		 * @param secretAccessKey The AWS secret access key
+		 * @return This builder instance
+		 */
+		public S3ClientBuilder credentials(String accessKeyId, String secretAccessKey) {
+			this.accessKeyId = accessKeyId;
+			this.secretAccessKey = secretAccessKey;
+			return this;
+		}
+
+		/**
+		 * Sets the RestClient to use for HTTP operations. If not specified, a default
+		 * RestClient will be created.
+		 * @param restClient The RestClient instance
+		 * @return This builder instance
+		 */
+		public S3ClientBuilder restClient(RestClient restClient) {
+			this.restClient = restClient;
+			return this;
+		}
+
+		/**
+		 * Builds the S3Client instance.
+		 * @return A new S3Client instance
+		 * @throws IllegalArgumentException if any required configuration is missing
+		 */
+		public S3Client build() {
+			S3ClientConfiguration configuration = new S3ClientConfiguration(endpoint, region, accessKeyId,
+					secretAccessKey);
+			configuration.validate();
+
+			RestClient clientToUse = restClient != null ? restClient : createDefaultRestClient();
+
+			return new S3Client(clientToUse, configuration);
+		}
+
+		/**
+		 * Creates a default RestClient configured with XML message converter.
+		 * @return A configured RestClient instance
+		 */
+		private static RestClient createDefaultRestClient() {
+			return RestClient.builder()
+				.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
+				.build();
+		}
+
 	}
 
 }
