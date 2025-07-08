@@ -28,7 +28,6 @@ import org.springframework.http.MediaType;
 public record S3Content(byte[] body, MediaType mediaType) {
 	/**
 	 * Creates S3Content from a string.
-	 *
 	 * @param body the content body as a string
 	 * @param mediaType the media type of the content
 	 * @return a new S3Content instance
@@ -39,7 +38,6 @@ public record S3Content(byte[] body, MediaType mediaType) {
 
 	/**
 	 * Creates S3Content from a byte array.
-	 *
 	 * @param body the content body as a byte array
 	 * @param mediaType the media type of the content
 	 * @return a new S3Content instance

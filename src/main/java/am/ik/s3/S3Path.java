@@ -35,7 +35,6 @@ public final class S3Path {
 
 	/**
 	 * Creates a new S3Path.
-	 *
 	 * @param bucket the bucket name
 	 * @param key the object key
 	 * @param encodeKey whether to encode the key (defaults to true if null)
@@ -48,7 +47,6 @@ public final class S3Path {
 
 	/**
 	 * Converts this S3Path to a canonical URI string.
-	 *
 	 * @return the canonical URI representation
 	 */
 	public String toCanonicalUri() {

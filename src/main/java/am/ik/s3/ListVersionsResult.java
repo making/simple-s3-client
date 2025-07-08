@@ -47,7 +47,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Creates a new ListVersionsResult.
-	 *
 	 * @param name the name of the bucket
 	 * @param prefix the prefix used in the listing request
 	 * @param keyMarker the key marker used for pagination
@@ -82,7 +81,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the name of the bucket.
-	 *
 	 * @return the bucket name
 	 */
 	public String name() {
@@ -91,7 +89,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the prefix used in the listing request.
-	 *
 	 * @return the prefix
 	 */
 	public String prefix() {
@@ -100,7 +97,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the key marker used for pagination.
-	 *
 	 * @return the key marker
 	 */
 	public String keyMarker() {
@@ -109,7 +105,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the next version ID marker for pagination.
-	 *
 	 * @return the next version ID marker
 	 */
 	public String nextVersionIdMarker() {
@@ -118,7 +113,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the version ID marker used for pagination.
-	 *
 	 * @return the version ID marker
 	 */
 	public String versionIdMarker() {
@@ -127,7 +121,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the maximum number of keys returned.
-	 *
 	 * @return the maximum keys
 	 */
 	public int maxKeys() {
@@ -136,7 +129,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Indicates if the result was truncated.
-	 *
 	 * @return true if truncated, false otherwise
 	 */
 	public boolean isTruncated() {
@@ -145,7 +137,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the list of delete markers.
-	 *
 	 * @return the delete markers
 	 */
 	public List<DeleteMarker> deleteMarkers() {
@@ -154,7 +145,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Returns the list of object versions.
-	 *
 	 * @return the versions
 	 */
 	public List<Version> versions() {
@@ -163,7 +153,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Sets the list of object versions.
-	 *
 	 * @param versions the versions to set
 	 */
 	public void setVersions(List<Version> versions) {
@@ -172,7 +161,6 @@ public final class ListVersionsResult {
 
 	/**
 	 * Sets the list of delete markers.
-	 *
 	 * @param deleteMarkers the delete markers to set
 	 */
 	public void setDeleteMarkers(List<DeleteMarker> deleteMarkers) {

@@ -76,7 +76,6 @@ public final class S3Request {
 
 	/**
 	 * Creates a new S3Request.
-	 *
 	 * @param endpoint the S3 endpoint URI
 	 * @param region the AWS region
 	 * @param accessKeyId the AWS access key ID
@@ -133,7 +132,6 @@ public final class S3Request {
 
 	/**
 	 * Returns the complete URI for this S3 request.
-	 *
 	 * @return the request URI
 	 */
 	public URI uri() {
@@ -142,7 +140,6 @@ public final class S3Request {
 
 	/**
 	 * Returns a consumer that adds the necessary headers to an HTTP request.
-	 *
 	 * @return a header consumer
 	 */
 	public Consumer<HttpHeaders> headers() {
@@ -151,7 +148,6 @@ public final class S3Request {
 
 	/**
 	 * Converts this S3 request to a Spring RequestEntity.BodyBuilder.
-	 *
 	 * @return a RequestEntity.BodyBuilder with the method, URI, and headers set
 	 */
 	public RequestEntity.BodyBuilder toEntityBuilder() {
