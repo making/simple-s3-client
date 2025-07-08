@@ -15,34 +15,78 @@
  */
 package am.ik.s3;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-
 import org.springframework.http.MediaType;
 
 /**
- * Represents content to be sent in an S3 request.
+ * Represents content to be sent in an S3 request. This is a sealed interface with two
+ * implementations: - ByteArrayS3Content for in-memory content - StreamS3Content for
+ * streaming content
  *
- * @param body the content body as a byte array
- * @param mediaType the media type of the content
+ * @since 0.3.0
  */
-public record S3Content(byte[] body, MediaType mediaType) {
+public sealed interface S3Content permits S3Content.ByteArrayS3Content, S3Content.StreamS3Content {
+
 	/**
 	 * Creates S3Content from a string.
 	 * @param body the content body as a string
 	 * @param mediaType the media type of the content
-	 * @return a new S3Content instance
+	 * @return a new ByteArrayS3Content instance
 	 */
-	public static S3Content of(String body, MediaType mediaType) {
-		return new S3Content(body.getBytes(StandardCharsets.UTF_8), mediaType);
+	static S3Content of(String body, MediaType mediaType) {
+		return new ByteArrayS3Content(body.getBytes(StandardCharsets.UTF_8), mediaType);
 	}
 
 	/**
 	 * Creates S3Content from a byte array.
 	 * @param body the content body as a byte array
 	 * @param mediaType the media type of the content
-	 * @return a new S3Content instance
+	 * @return a new ByteArrayS3Content instance
 	 */
-	public static S3Content of(byte[] body, MediaType mediaType) {
-		return new S3Content(body, mediaType);
+	static S3Content of(byte[] body, MediaType mediaType) {
+		return new ByteArrayS3Content(body, mediaType);
 	}
+
+	/**
+	 * Creates streaming S3Content with content length and media type.
+	 * @param contentLength the length of the content in bytes
+	 * @param mediaType the media type of the content
+	 * @return a new StreamS3Content instance
+	 * @since 0.3.0
+	 */
+	static S3Content ofStream(long contentLength, MediaType mediaType) {
+		return new StreamS3Content(contentLength, mediaType);
+	}
+
+	/**
+	 * Creates streaming S3Content with content length and default media type.
+	 * @param contentLength the length of the content in bytes
+	 * @return a new StreamS3Content instance
+	 * @since 0.3.0
+	 */
+	static S3Content ofStream(long contentLength) {
+		return new StreamS3Content(contentLength, MediaType.APPLICATION_OCTET_STREAM);
+	}
+
+	/**
+	 * Represents in-memory content to be sent in an S3 request.
+	 *
+	 * @param body the content body as a byte array
+	 * @param mediaType the media type of the content
+	 */
+	record ByteArrayS3Content(byte[] body, MediaType mediaType) implements S3Content {
+	}
+
+	/**
+	 * Represents streaming content to be sent in an S3 request. This allows for
+	 * memory-efficient uploads of large files.
+	 *
+	 * @param contentLength the length of the content in bytes
+	 * @param mediaType the media type of the content
+	 * @since 0.3.0
+	 */
+	record StreamS3Content(long contentLength, MediaType mediaType) implements S3Content {
+	}
+
 }

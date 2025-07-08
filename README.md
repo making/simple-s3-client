@@ -57,6 +57,31 @@ System.out.println("Content: " + content); // Content: Hello World!
 
 byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
 
+// Streaming operations for large files
+try (InputStream largeFileStream = Files.newInputStream(Paths.get("large-file.dat"))) {
+    long fileSize = Files.size(Paths.get("large-file.dat"));
+    client.bucket("my-bucket")
+        .object("large-file.dat")
+        .putStream(largeFileStream, fileSize);
+}
+
+// Download large files as stream
+try (InputStream downloadStream = client.bucket("my-bucket")
+    .object("large-file.dat")
+    .getAsStream()) {
+    // Process stream without loading entire file into memory
+    Files.copy(downloadStream, Paths.get("downloaded-file.dat"));
+}
+
+// Range requests for partial content
+try (InputStream partialStream = client.bucket("my-bucket")
+    .object("large-file.dat")
+    .range(1024, 2048)
+    .getAsStream()) {
+    // Download only bytes 1024-2048
+    byte[] partialData = partialStream.readAllBytes();
+}
+
 // Generate presigned URLs for secure access
 PresignedUrl getUrl = client.bucket("my-bucket")
     .object("hello.txt")
@@ -444,6 +469,68 @@ String response = restClient.get()
 	.body(String.class);
 System.out.println("Response: " + response); // Response: Hello World!
 
+// Streaming GET with range request
+S3Request rangeRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("large-file.dat"))
+	.build()
+	.withRange(1024, 2048);
+	
+try (InputStream rangeStream = restClient.get()
+	.uri(rangeRequest.uri())
+	.headers(rangeRequest.headers())
+	.retrieve()
+	.body(InputStream.class)) {
+	// Process partial content stream
+	byte[] partialData = rangeStream.readAllBytes();
+}
+
+// Streaming PUT with InputStream using S3Content.ofStream
+try (InputStream fileStream = Files.newInputStream(Paths.get("large-file.dat"))) {
+	long fileSize = Files.size(Paths.get("large-file.dat"));
+	S3Request putStreamRequest = s3Request().endpoint(endpoint)
+		.region(region)
+		.accessKeyId(accessKeyId)
+		.secretAccessKey(secretAccessKey)
+		.method(HttpMethod.PUT)
+		.path(b -> b.bucket(bucket).key("large-file.dat"))
+		.content(S3Content.ofStream(fileSize, MediaType.APPLICATION_OCTET_STREAM))
+		.build();
+	
+	restClient.put()
+		.uri(putStreamRequest.uri())
+		.headers(putStreamRequest.headers())
+		.body(new org.springframework.core.io.InputStreamResource(fileStream) {
+			@Override
+			public long contentLength() {
+				return fileSize;
+			}
+		})
+		.retrieve()
+		.toBodilessEntity();
+}
+
+// Streaming GET as InputStream
+S3Request getStreamRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("large-file.dat"))
+	.build();
+
+try (InputStream downloadStream = restClient.get()
+	.uri(getStreamRequest.uri())
+	.headers(getStreamRequest.headers())
+	.retrieve()
+	.body(InputStream.class)) {
+	// Process downloaded stream without loading entire file into memory
+	Files.copy(downloadStream, Paths.get("downloaded-file.dat"));
+}
+
 // Delete an object
 S3Request deleteObjectRequest = s3Request().endpoint(endpoint)
 	.region(region)
@@ -642,8 +729,13 @@ try {
 - `.put(String content, MediaType mediaType)` - Upload string with specific media type
 - `.put(byte[] content)` - Upload binary content as application/octet-stream
 - `.put(byte[] content, MediaType mediaType)` - Upload binary with specific media type
+- `.putStream(InputStream, long contentLength)` - Upload from InputStream with known length
+- `.putStream(InputStream, long contentLength, MediaType)` - Upload from InputStream with specific media type
 - `.get()` - Download as string
 - `.getAsBytes()` - Download as byte array
+- `.getAsStream()` - Download as InputStream for streaming
+- `.getAsStream(long start, long end)` - Download specific byte range as InputStream
+- `.getAsStreamFrom(long start)` - Download from specific byte position as InputStream
 - `.delete()` - Delete the object
 
 #### Presigned URL Operations
@@ -672,6 +764,15 @@ try {
 - `.upload(InputStream, long)` - Upload from input stream (synchronous)
 - `.uploadAsync(byte[])` - Upload data asynchronously
 - `.uploadAsync(InputStream, long)` - Upload from input stream asynchronously
+
+#### Range Request Operations
+- `.range(long start, long end)` - Create range request builder for partial content retrieval
+- `.rangeFrom(long start)` - Create range request builder from specific position to end
+- Range request builder methods:
+  - `.getAsStream()` - Download partial content as InputStream
+  - `.getAsBytes()` - Download partial content as byte array
+  - `.get()` - Download partial content as string
+
 
 ### When to Use Which API
 
