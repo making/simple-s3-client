@@ -341,6 +341,152 @@ public class S3OperationBuilder {
 			return request.presignedPostForm(expiration);
 		}
 
+		/**
+		 * Creates a multipart upload builder for this object.
+		 * @return a new MultipartUploadBuilder instance
+		 * @since 0.3.0
+		 */
+		public MultipartUploadBuilder multipartUpload() {
+			return new MultipartUploadBuilder(bucketName, objectKey);
+		}
+
+	}
+
+	/**
+	 * Builder class for multipart upload operations.
+	 */
+	public class MultipartUploadBuilder {
+
+		private final String bucketName;
+
+		private final String objectKey;
+
+		private MultipartUploadConfiguration configuration = MultipartUploadConfiguration.defaultConfiguration();
+
+		private ProgressCallback progressCallback = ProgressCallback.noOp();
+
+		private MultipartUploadBuilder(String bucketName, String objectKey) {
+			this.bucketName = bucketName;
+			this.objectKey = objectKey;
+		}
+
+		/**
+		 * Sets the part size for multipart upload.
+		 * @param partSize the part size
+		 * @return this builder
+		 */
+		public MultipartUploadBuilder partSize(org.springframework.util.unit.DataSize partSize) {
+			this.configuration = MultipartUploadConfiguration.builder()
+				.partSize(partSize)
+				.maxConcurrentUploads(configuration.maxConcurrentUploads())
+				.enableProgressTracking(configuration.enableProgressTracking())
+				.executor(configuration.executor())
+				.build();
+			return this;
+		}
+
+		/**
+		 * Sets the maximum number of concurrent uploads.
+		 * @param maxConcurrentUploads the maximum concurrent uploads
+		 * @return this builder
+		 */
+		public MultipartUploadBuilder maxConcurrentUploads(int maxConcurrentUploads) {
+			this.configuration = MultipartUploadConfiguration.builder()
+				.partSize(configuration.partSize())
+				.maxConcurrentUploads(maxConcurrentUploads)
+				.enableProgressTracking(configuration.enableProgressTracking())
+				.executor(configuration.executor())
+				.build();
+			return this;
+		}
+
+		/**
+		 * Sets the progress callback for tracking upload progress.
+		 * @param progressCallback the progress callback
+		 * @return this builder
+		 */
+		public MultipartUploadBuilder progressCallback(ProgressCallback progressCallback) {
+			this.progressCallback = progressCallback != null ? progressCallback : ProgressCallback.noOp();
+			return this;
+		}
+
+		/**
+		 * Sets the executor for asynchronous operations.
+		 * @param executor the executor to use for async operations
+		 * @return this builder
+		 */
+		public MultipartUploadBuilder executor(java.util.concurrent.Executor executor) {
+			this.configuration = MultipartUploadConfiguration.builder()
+				.partSize(configuration.partSize())
+				.maxConcurrentUploads(configuration.maxConcurrentUploads())
+				.enableProgressTracking(configuration.enableProgressTracking())
+				.executor(executor)
+				.build();
+			return this;
+		}
+
+		/**
+		 * Sets the multipart upload configuration.
+		 * @param configuration the configuration
+		 * @return this builder
+		 */
+		public MultipartUploadBuilder configuration(MultipartUploadConfiguration configuration) {
+			this.configuration = configuration != null ? configuration
+					: MultipartUploadConfiguration.defaultConfiguration();
+			return this;
+		}
+
+		/**
+		 * Uploads data using multipart upload.
+		 * @param data the data to upload
+		 * @return the result of the completed multipart upload
+		 */
+		public CompleteMultipartUploadResult upload(byte[] data) {
+			return createMultipartUpload().upload(data);
+		}
+
+		/**
+		 * Uploads data from an input stream using multipart upload.
+		 * @param inputStream the input stream to read data from
+		 * @param contentLength the total length of the data
+		 * @return the result of the completed multipart upload
+		 */
+		public CompleteMultipartUploadResult upload(java.io.InputStream inputStream, long contentLength) {
+			return createMultipartUpload().upload(inputStream, contentLength);
+		}
+
+		/**
+		 * Uploads data using multipart upload asynchronously.
+		 * @param data the data to upload
+		 * @return a CompletableFuture that will complete with the upload result
+		 */
+		public java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> uploadAsync(byte[] data) {
+			return createMultipartUpload().uploadAsync(data);
+		}
+
+		/**
+		 * Uploads data from an input stream using multipart upload asynchronously.
+		 * @param inputStream the input stream to read data from
+		 * @param contentLength the total length of the data
+		 * @return a CompletableFuture that will complete with the upload result
+		 */
+		public java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> uploadAsync(
+				java.io.InputStream inputStream, long contentLength) {
+			return createMultipartUpload().uploadAsync(inputStream, contentLength);
+		}
+
+		private MultipartUpload createMultipartUpload() {
+			S3Request baseRequest = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.PUT)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+
+			return new MultipartUpload(restClient, baseRequest, configuration, progressCallback);
+		}
+
 	}
 
 }
