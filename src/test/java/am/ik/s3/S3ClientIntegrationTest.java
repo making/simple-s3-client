@@ -21,18 +21,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.S3;
 
 /**
- * Integration tests for FluentS3Client using LocalStack.
+ * Integration tests for S3Client using LocalStack.
  */
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class FluentS3ClientIntegrationTest {
+class S3ClientIntegrationTest {
 
 	@Container
 	static LocalStackContainer localstack = new LocalStackContainer(
 			DockerImageName.parse("localstack/localstack:3.0.0"))
 		.withServices(S3);
 
-	private FluentS3Client client;
+	private S3Client client;
 
 	@BeforeEach
 	void setUp() {
@@ -44,7 +44,7 @@ class FluentS3ClientIntegrationTest {
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 			.build();
 
-		client = FluentS3Client.builder()
+		client = S3Client.builder()
 			.endpoint(localstack.getEndpointOverride(S3).toString())
 			.region(localstack.getRegion())
 			.credentials(localstack.getAccessKey(), localstack.getSecretKey())

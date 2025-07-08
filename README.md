@@ -4,7 +4,7 @@ A simple S3 Java Client that works with Spring `RestTemplate` or `RestClient`
 
 This library provides two ways to interact with S3:
 1. **Low-level API** using `S3Request` with `RestTemplate` or `RestClient`
-2. **Fluent API** using `FluentS3Client` (Recommended for new projects)
+2. **Fluent API** using `S3Client` (Recommended for new projects)
 
 ```xml
 		<dependency>
@@ -14,13 +14,13 @@ This library provides two ways to interact with S3:
 		</dependency>
 ```
 
-## Examples with `FluentS3Client` (Recommended)
+## Examples with `S3Client` (Recommended)
 
-The `FluentS3Client` provides a modern, fluent API for S3 operations with method chaining.
+The `S3Client` provides a modern, fluent API for S3 operations with method chaining.
 
 ```java
 // Create client with default RestClient configuration
-FluentS3Client client = FluentS3Client.builder()
+S3Client client = S3Client.builder()
     .endpoint("https://s3.amazonaws.com")
     .region("us-east-1")
     .credentials("accessKeyId", "secretAccessKey")
@@ -31,7 +31,7 @@ RestClient customRestClient = RestClient.builder()
     .messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
     .build();
 
-FluentS3Client client = FluentS3Client.builder()
+S3Client client = S3Client.builder()
     .endpoint("https://s3.amazonaws.com")
     .region("us-east-1")
     .credentials("accessKeyId", "secretAccessKey")
@@ -272,10 +272,10 @@ restClient.delete()
 
 ## API Overview
 
-### FluentS3Client
+### S3Client
 
 #### Client Creation
-- `FluentS3Client.builder()` - Start building a client
+- `S3Client.builder()` - Start building a client
 - `.endpoint(String)` - Set S3 endpoint URL
 - `.region(String)` - Set AWS region
 - `.credentials(String accessKeyId, String secretAccessKey)` - Set AWS credentials
@@ -301,7 +301,7 @@ restClient.delete()
 
 ### When to Use Which API
 
-**Use FluentS3Client when:**
+**Use S3Client when:**
 - Building new applications
 - You want a modern, intuitive API
 - You prefer method chaining
@@ -311,4 +311,4 @@ restClient.delete()
 - You need fine-grained control over HTTP requests
 - Working with existing code that uses S3Request
 - Building custom abstractions on top of the library
-- You need to access advanced S3 features not covered by FluentS3Client
+- You need to access advanced S3 features not covered by S3Client
