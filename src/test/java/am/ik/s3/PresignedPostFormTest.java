@@ -17,7 +17,6 @@ package am.ik.s3;
 
 import java.net.URI;
 import java.time.Duration;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.util.unit.DataSize;
 
@@ -39,8 +38,6 @@ class PresignedPostFormTest {
 
 	@Test
 	void testPresignedPostFormGeneration() {
-		S3ClientConfiguration config = new S3ClientConfiguration(URI.create(ENDPOINT), REGION, ACCESS_KEY_ID,
-				SECRET_ACCESS_KEY);
 		S3Client client = S3Client.builder()
 			.endpoint(ENDPOINT)
 			.region(REGION)
@@ -49,8 +46,7 @@ class PresignedPostFormTest {
 
 		PresignedPostForm postForm = client.bucket(BUCKET)
 			.object(OBJECT_KEY)
-			.presignedPostForm()
-			.expiration(Duration.ofHours(1))
+			.presignedPostForm(Duration.ofHours(1))
 			.maxFileSize(10 * 1024 * 1024) // 10MB
 			.generate();
 
@@ -69,8 +65,6 @@ class PresignedPostFormTest {
 
 	@Test
 	void testPresignedPostFormWithCustomFields() {
-		S3ClientConfiguration config = new S3ClientConfiguration(URI.create(ENDPOINT), REGION, ACCESS_KEY_ID,
-				SECRET_ACCESS_KEY);
 		S3Client client = S3Client.builder()
 			.endpoint(ENDPOINT)
 			.region(REGION)
@@ -79,11 +73,10 @@ class PresignedPostFormTest {
 
 		PresignedPostForm postForm = client.bucket(BUCKET)
 			.object(OBJECT_KEY)
-			.presignedPostForm()
-			.expiration(Duration.ofMinutes(30))
+			.presignedPostForm(Duration.ofMinutes(30))
 			.maxFileSize(5 * 1024 * 1024) // 5MB
-			.field("Content-Type", "text/plain")
-			.field("Cache-Control", "max-age=3600")
+			.addField("Content-Type", "text/plain")
+			.addField("Cache-Control", "max-age=3600")
 			.generate();
 
 		assertThat(postForm.formFields()).containsEntry("Content-Type", "text/plain");
@@ -92,8 +85,6 @@ class PresignedPostFormTest {
 
 	@Test
 	void testPresignedPostFormWithDataSizeMaxFileSize() {
-		S3ClientConfiguration config = new S3ClientConfiguration(URI.create(ENDPOINT), REGION, ACCESS_KEY_ID,
-				SECRET_ACCESS_KEY);
 		S3Client client = S3Client.builder()
 			.endpoint(ENDPOINT)
 			.region(REGION)
@@ -102,10 +93,9 @@ class PresignedPostFormTest {
 
 		PresignedPostForm postForm = client.bucket(BUCKET)
 			.object(OBJECT_KEY)
-			.presignedPostForm()
-			.expiration(Duration.ofHours(1))
+			.presignedPostForm(Duration.ofHours(1))
 			.maxFileSize(DataSize.ofMegabytes(20)) // 20MB using DataSize
-			.field("Content-Type", "application/json")
+			.addField("Content-Type", "application/json")
 			.generate();
 
 		assertThat(postForm.formFields()).containsKey("key");

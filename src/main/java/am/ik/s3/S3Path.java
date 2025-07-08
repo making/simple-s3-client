@@ -16,9 +16,7 @@
 package am.ik.s3;
 
 import java.util.Objects;
-
 import org.jilt.Builder;
-
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
@@ -43,6 +41,22 @@ public final class S3Path {
 		this.bucket = bucket;
 		this.key = key;
 		this.encodeKey = Objects.requireNonNullElse(encodeKey, true);
+	}
+
+	/**
+	 * Returns the bucket name.
+	 * @return the bucket name
+	 */
+	public String bucket() {
+		return bucket;
+	}
+
+	/**
+	 * Returns the object key.
+	 * @return the object key
+	 */
+	public String key() {
+		return key;
 	}
 
 	/**

@@ -17,70 +17,53 @@ package am.ik.s3;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Objects;
+import java.util.function.Function;
 import org.springframework.util.unit.DataSize;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Represents a presigned POST form for direct browser uploads to S3.
  *
+ * @param url the URL to POST the form to
+ * @param formFields the form fields that must be included in the POST request
+ * @param expiresAt the instant when this presigned POST form expires
+ * @param conditions the policy conditions that were used to generate this form
  * @since 0.3.0
  */
 public record PresignedPostForm(URI url, Map<String, String> formFields, Instant expiresAt, List<String> conditions) {
 
 	/**
-	 * Creates a new builder for presigned POST forms.
-	 * @param configuration the S3 client configuration
-	 * @param bucketName the bucket name
-	 * @param objectKey the object key
-	 * @return a new builder instance
-	 */
-	public static Builder builder(S3ClientConfiguration configuration, String bucketName, String objectKey) {
-		return new Builder(configuration, bucketName, objectKey);
-	}
-
-	/**
-	 * Builder for generating presigned POST forms for direct browser uploads to S3.
+	 * Builder for generating presigned POST forms for direct browser uploads to S3. This
+	 * builder can only be created from S3Request and contains pre-computed information.
 	 *
 	 * @since 0.3.0
 	 */
-	public static class Builder {
+	public static class Generator {
 
-		private final S3ClientConfiguration configuration;
+		private final URI url;
 
-		private final String bucketName;
+		private final Instant expirationTime;
 
-		private final String objectKey;
-
-		private Duration expiration = Duration.ofHours(1);
+		private final Function<String, String> signatureGenerator;
 
 		private final Map<String, String> formFields = new LinkedHashMap<>();
 
 		private final List<String> conditions = new ArrayList<>();
 
-		private Long maxFileSize;
+		private DataSize maxFileSize;
 
-		private Builder(S3ClientConfiguration configuration, String bucketName, String objectKey) {
-			this.configuration = configuration;
-			this.bucketName = bucketName;
-			this.objectKey = objectKey;
-		}
-
-		/**
-		 * Sets the expiration duration for the presigned POST form.
-		 * @param expiration the duration until the form expires
-		 * @return this builder
-		 */
-		public Builder expiration(Duration expiration) {
-			this.expiration = expiration;
-			return this;
+		// Package-private constructor - only S3Request can create this
+		Generator(URI url, Instant expirationTime, Function<String, String> signatureGenerator) {
+			this.url = Objects.requireNonNull(url, "url must not be null");
+			this.expirationTime = Objects.requireNonNull(expirationTime, "expirationTime must not be null");
+			this.signatureGenerator = Objects.requireNonNull(signatureGenerator, "signatureGenerator must not be null");
 		}
 
 		/**
@@ -88,8 +71,8 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 		 * @param maxFileSize the maximum file size in bytes
 		 * @return this builder
 		 */
-		public Builder maxFileSize(long maxFileSize) {
-			this.maxFileSize = maxFileSize;
+		public Generator maxFileSize(long maxFileSize) {
+			this.maxFileSize = DataSize.ofBytes(maxFileSize);
 			return this;
 		}
 
@@ -98,8 +81,8 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 		 * @param maxFileSize the maximum file size as DataSize
 		 * @return this builder
 		 */
-		public Builder maxFileSize(DataSize maxFileSize) {
-			this.maxFileSize = maxFileSize.toBytes();
+		public Generator maxFileSize(DataSize maxFileSize) {
+			this.maxFileSize = maxFileSize;
 			return this;
 		}
 
@@ -109,8 +92,18 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 		 * @param value the field value
 		 * @return this builder
 		 */
-		public Builder field(String name, String value) {
+		public Generator addField(String name, String value) {
 			this.formFields.put(name, value);
+			return this;
+		}
+
+		/**
+		 * Adds multiple form fields to be included in the POST form.
+		 * @param fields the map of field names to values
+		 * @return this builder
+		 */
+		public Generator addFields(Map<String, String> fields) {
+			this.formFields.putAll(fields);
 			return this;
 		}
 
@@ -119,8 +112,18 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 		 * @param condition the condition string
 		 * @return this builder
 		 */
-		public Builder condition(String condition) {
+		public Generator addCondition(String condition) {
 			this.conditions.add(condition);
+			return this;
+		}
+
+		/**
+		 * Adds multiple conditions to the policy.
+		 * @param conditions the list of condition strings
+		 * @return this builder
+		 */
+		public Generator addConditions(List<String> conditions) {
+			this.conditions.addAll(conditions);
 			return this;
 		}
 
@@ -129,65 +132,31 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 		 * @return the presigned POST form
 		 */
 		public PresignedPostForm generate() {
-			Instant expirationTime = Instant.now().plus(expiration);
-			AmzDate amzDate = new AmzDate(Instant.now());
-
-			URI url = UriComponentsBuilder.fromUri(configuration.endpoint()).path("/" + bucketName).build().toUri();
-
-			String credentialScope = "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), configuration.region());
-			String credential = "%s/%s".formatted(configuration.accessKeyId(), credentialScope);
-
-			Map<String, String> fields = new LinkedHashMap<>();
-			fields.put("key", objectKey);
-			fields.put("bucket", bucketName);
-			fields.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
-			fields.put("X-Amz-Credential", credential);
-			fields.put("X-Amz-Date", amzDate.date());
-			fields.putAll(formFields);
-
 			List<String> policyConditions = new ArrayList<>();
-			policyConditions.add("{\"bucket\": \"" + bucketName + "\"}");
-			policyConditions.add("{\"key\": \"" + objectKey + "\"}");
-			policyConditions.add("{\"X-Amz-Algorithm\": \"AWS4-HMAC-SHA256\"}");
-			policyConditions.add("{\"X-Amz-Credential\": \"" + credential + "\"}");
-			policyConditions.add("{\"X-Amz-Date\": \"" + amzDate.date() + "\"}");
-
+			Map<String, String> fields = new LinkedHashMap<>(this.formFields);
 			// Add conditions for form fields
-			formFields.forEach((key, value) -> {
-				policyConditions.add("{\"" + key + "\": \"" + value + "\"}");
+			fields.forEach((key, value) -> {
+				policyConditions.add("""
+						{"%s": "%s"}""".formatted(key, value));
 			});
-
 			if (maxFileSize != null) {
-				policyConditions.add("[\"content-length-range\", 0, " + maxFileSize + "]");
+				policyConditions.add("""
+						["content-length-range", 0, %d]""".formatted(maxFileSize.toBytes()));
 			}
-
-			policyConditions.addAll(conditions);
-
-			String policy = "{\n" + "  \"expiration\": \"" + expirationTime.toString() + "\",\n"
-					+ "  \"conditions\": [\n    " + String.join(",\n    ", policyConditions) + "\n  ]\n" + "}";
-
+			policyConditions.addAll(this.conditions);
+			String policy = """
+					{
+					  "expiration": "%s",
+					  "conditions": [
+					    %s
+					  ]
+					}""".formatted(expirationTime, String.join(",\n    ", policyConditions));
 			String encodedPolicy = Base64.getEncoder().encodeToString(policy.getBytes(StandardCharsets.UTF_8));
 			fields.put("policy", encodedPolicy);
-
-			String signature = generateSignature(encodedPolicy, amzDate);
+			String signature = this.signatureGenerator.apply(encodedPolicy);
 			fields.put("X-Amz-Signature", signature);
-
-			return new PresignedPostForm(url, fields, expirationTime, conditions);
-		}
-
-		private String generateSignature(String policy, AmzDate amzDate) {
-			try {
-				byte[] kSecret = ("AWS4" + configuration.secretAccessKey()).getBytes(StandardCharsets.UTF_8);
-				byte[] kDate = S3RequestSigningUtils.hmacSHA256(amzDate.yymmdd(), kSecret);
-				byte[] kRegion = S3RequestSigningUtils.hmacSHA256(configuration.region(), kDate);
-				byte[] kService = S3RequestSigningUtils.hmacSHA256("s3", kRegion);
-				byte[] kSigning = S3RequestSigningUtils.hmacSHA256("aws4_request", kService);
-				byte[] signature = S3RequestSigningUtils.hmacSHA256(policy, kSigning);
-				return S3RequestSigningUtils.encodeHex(signature);
-			}
-			catch (Exception e) {
-				throw new RuntimeException("Failed to generate signature", e);
-			}
+			return new PresignedPostForm(url, Collections.unmodifiableMap(fields), expirationTime,
+					Collections.unmodifiableList(conditions));
 		}
 
 	}

@@ -60,28 +60,42 @@ byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
 // Generate presigned URLs for secure access
 PresignedUrl getUrl = client.bucket("my-bucket")
     .object("hello.txt")
-    .presignedUrl()
-    .expiration(Duration.ofHours(2))
-    .forGet();
+    .presignedUrl(HttpMethod.GET, Duration.ofHours(2));
 System.out.println("Get URL: " + getUrl.url());
 
+// Presigned URL with additional headers
+Map<String, String> headers = Map.of("Content-Type", "text/plain");
 PresignedUrl putUrl = client.bucket("my-bucket")
     .object("upload.txt")
-    .presignedUrl()
-    .expiration(Duration.ofMinutes(15))
-    .contentType("text/plain")
-    .forPut();
+    .presignedUrl(HttpMethod.PUT, Duration.ofMinutes(15), headers);
 System.out.println("Put URL: " + putUrl.url());
+
+// Use presigned URL with RestClient
+restClient.put()
+    .uri(putUrl.url())
+    .headers(putUrl.headers())
+    .body("File content")
+    .retrieve()
+    .toBodilessEntity();
 
 // Generate presigned POST form for browser uploads
 PresignedPostForm postForm = client.bucket("my-bucket")
-    .object("uploads/${filename}")
-    .presignedPostForm()
-    .expiration(Duration.ofHours(1))
+    .object("uploads/file.txt")
+    .presignedPostForm(Duration.ofHours(1))
     .maxFileSize(DataSize.ofMegabytes(10))
+    .addField("Content-Type", "text/plain")
     .generate();
 System.out.println("POST URL: " + postForm.url());
 System.out.println("Form fields: " + postForm.formFields());
+
+// Using presigned URL in HTML form
+// <form action="${postForm.url()}" method="post" enctype="multipart/form-data">
+//   ${postForm.formFields().entrySet().stream()
+//     .map(e -> "<input type='hidden' name='" + e.getKey() + "' value='" + e.getValue() + "'>")
+//     .collect(Collectors.joining("\n"))}
+//   <input type="file" name="file" required>
+//   <button type="submit">Upload</button>
+// </form>
 
 // Clean up
 client.bucket("my-bucket").object("hello.txt").delete();
@@ -97,12 +111,16 @@ Make sure the `RestTemplate` has `MappingJackson2XmlHttpMessageConverter` to con
 ```java
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
 URI endpoint = URI.create("https://...");
 String region = "...";
 String accessKeyId = "...";
 String secretAccessKey = "...";
 String bucket = "...";
-RestTemplate restTempalte = ...;
+RestTemplate restTemplate = ...;
 
 // Put a bucket
 S3Request putBucketRequest = s3Request().endpoint(endpoint)
@@ -192,7 +210,7 @@ S3Request getRequest = s3Request().endpoint(endpoint)
 	.path(b -> b.bucket(bucket).key("hello.txt"))
 	.build();
 
-PresignedUrl presignedUrl = getRequest.generatePresignedUrl(Duration.ofHours(1));
+PresignedUrl presignedUrl = getRequest.presignedUrl(Duration.ofHours(1));
 System.out.println("Presigned URL: " + presignedUrl.url());
 
 // Use the presigned URL with RestTemplate
@@ -202,15 +220,53 @@ HttpEntity<Void> httpEntity = new HttpEntity<>(httpHeaders);
 String content = restTemplate.exchange(presignedUrl.url(), HttpMethod.GET, httpEntity, String.class).getBody();
 
 // Generate presigned POST form for browser uploads
-S3ClientConfiguration config = new S3ClientConfiguration(endpoint, region, accessKeyId, secretAccessKey);
-PresignedPostForm postForm = PresignedPostForm.builder(config, bucket, "uploads/file.txt")
-	.expiration(Duration.ofHours(1))
+S3Request postRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.POST)  // Note: Use POST for S3Request
+	.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+	.build();
+
+PresignedPostForm postForm = postRequest.presignedPostForm(Duration.ofHours(1))
 	.maxFileSize(DataSize.ofMegabytes(10))
-	.field("Content-Type", "text/plain")
+	.addField("Content-Type", "text/plain")
 	.generate();
 
 System.out.println("POST URL: " + postForm.url());
 System.out.println("Form fields: " + postForm.formFields());
+
+// Use the presigned POST form to upload a file
+MultiValueMap<String, Object> formData = new LinkedMultiValueMap<>();
+// Add all form fields from the presigned POST form
+postForm.formFields().forEach(formData::add);
+// Add the file content
+String fileContent = "This is a test file uploaded via presigned POST form";
+ByteArrayResource fileResource = new ByteArrayResource(fileContent.getBytes()) {
+	@Override
+	public String getFilename() {
+		return "file.txt";
+	}
+};
+formData.add("file", fileResource);
+
+// POST the form data
+HttpHeaders postHeaders = new HttpHeaders();
+postHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+HttpEntity<MultiValueMap<String, Object>> postEntity = new HttpEntity<>(formData, postHeaders);
+restTemplate.postForEntity(postForm.url(), postEntity, Void.class);
+System.out.println("File uploaded successfully via presigned POST form");
+
+// Verify the uploaded file
+S3Request verifyRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+	.build();
+String uploadedContent = restTemplate.exchange(verifyRequest.toEntityBuilder().build(), String.class).getBody();
+System.out.println("Uploaded content: " + uploadedContent);
 ```
 
 ## Examples with `RestClient` (Low-level API)
@@ -219,6 +275,10 @@ Make sure the `RestClient` has `MappingJackson2XmlHttpMessageConverter` to conve
 
 ```java
 import static am.ik.s3.S3RequestBuilder.s3Request;
+
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 URI endpoint = URI.create("https://...");
 String region = "...";
@@ -336,7 +396,7 @@ S3Request getRequest = s3Request().endpoint(endpoint)
 	.path(b -> b.bucket(bucket).key("hello.txt"))
 	.build();
 
-PresignedUrl presignedUrl = getRequest.generatePresignedUrl(Duration.ofHours(1));
+PresignedUrl presignedUrl = getRequest.presignedUrl(Duration.ofHours(1));
 System.out.println("Presigned URL: " + presignedUrl.url());
 
 // Use the presigned URL
@@ -347,15 +407,59 @@ String content = restClient.get()
 	.body(String.class);
 
 // Generate presigned POST form for browser uploads
-S3ClientConfiguration config = new S3ClientConfiguration(endpoint, region, accessKeyId, secretAccessKey);
-PresignedPostForm postForm = PresignedPostForm.builder(config, bucket, "uploads/file.txt")
-	.expiration(Duration.ofHours(1))
+S3Request postRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.POST)  // Note: Use POST for S3Request
+	.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+	.build();
+
+PresignedPostForm postForm = postRequest.presignedPostForm(Duration.ofHours(1))
 	.maxFileSize(DataSize.ofMegabytes(10))
-	.field("Content-Type", "text/plain")
+	.addField("Content-Type", "text/plain")
 	.generate();
 
 System.out.println("POST URL: " + postForm.url());
 System.out.println("Form fields: " + postForm.formFields());
+
+// Use the presigned POST form to upload a file
+MultiValueMap<String, Object> formData = new LinkedMultiValueMap<>();
+// Add all form fields from the presigned POST form
+postForm.formFields().forEach(formData::add);
+// Add the file content
+String fileContent = "This is a test file uploaded via presigned POST form";
+ByteArrayResource fileResource = new ByteArrayResource(fileContent.getBytes()) {
+	@Override
+	public String getFilename() {
+		return "file.txt";
+	}
+};
+formData.add("file", fileResource);
+
+// POST the form data
+restClient.post()
+	.uri(postForm.url())
+	.contentType(MediaType.MULTIPART_FORM_DATA)
+	.body(formData)
+	.retrieve()
+	.toBodilessEntity();
+System.out.println("File uploaded successfully via presigned POST form");
+
+// Verify the uploaded file
+S3Request verifyRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+	.build();
+String uploadedContent = restClient.get()
+	.uri(verifyRequest.uri())
+	.headers(verifyRequest.headers())
+	.retrieve()
+	.body(String.class);
+System.out.println("Uploaded content: " + uploadedContent);
 ```
 
 ## API Overview
@@ -388,21 +492,19 @@ System.out.println("Form fields: " + postForm.formFields());
 - `.delete()` - Delete the object
 
 #### Presigned URL Operations
-- `.presignedUrl()` - Create a presigned URL builder
-- `.expiration(Duration)` - Set expiration time for the URL
-- `.contentType(String)` - Set content type for PUT operations
-- `.header(String, String)` - Add custom headers
-- `.parameter(String, String)` - Add query parameters
-- `.forGet()` - Generate presigned URL for GET operation
-- `.forPut()` - Generate presigned URL for PUT operation
-- `.forDelete()` - Generate presigned URL for DELETE operation
+- `.presignedUrl(HttpMethod)` - Generate presigned URL with default 1 hour expiration
+- `.presignedUrl(HttpMethod, Duration)` - Generate presigned URL with custom expiration
+- `.presignedUrl(HttpMethod, Duration, Map<String, String>)` - Generate presigned URL with additional headers
 
 #### Presigned POST Form Operations
-- `.presignedPostForm()` - Create a presigned POST form builder
-- `.expiration(Duration)` - Set expiration time for the form
-- `.maxFileSize(DataSize)` - Set maximum file size in bytes
-- `.field(String, String)` - Add form field
-- `.condition(String)` - Add policy condition
+- `.presignedPostForm()` - Create a presigned POST form generator with default 1 hour expiration
+- `.presignedPostForm(Duration)` - Create a presigned POST form generator with custom expiration
+- `.maxFileSize(long)` - Set maximum file size in bytes
+- `.maxFileSize(DataSize)` - Set maximum file size using DataSize
+- `.addField(String, String)` - Add a form field
+- `.addFields(Map<String, String>)` - Add multiple form fields
+- `.addCondition(String)` - Add a policy condition
+- `.addConditions(List<String>)` - Add multiple policy conditions
 - `.generate()` - Generate the presigned POST form
 
 ### When to Use Which API

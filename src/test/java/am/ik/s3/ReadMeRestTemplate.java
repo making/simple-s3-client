@@ -16,6 +16,7 @@
 package am.ik.s3;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.UUID;
 
 import am.ik.spring.logbook.AccessLoggerSink;
@@ -23,8 +24,14 @@ import am.ik.spring.logbook.OpinionatedFilters;
 import org.zalando.logbook.Logbook;
 import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestTemplate;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
@@ -99,6 +106,74 @@ public class ReadMeRestTemplate {
 		String response = restTemplate.exchange(getObjectRequest.toEntityBuilder().build(), String.class).getBody();
 		System.out.println("Response: " + response); // Response: Hello World!
 
+		// Generate presigned URL for GET operation
+		S3Request getRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(bucket).key("hello.txt"))
+			.build();
+
+		PresignedUrl presignedUrl = getRequest.presignedUrl(Duration.ofHours(1));
+		System.out.println("Presigned URL: " + presignedUrl.url());
+
+		// Use the presigned URL with RestTemplate
+		HttpHeaders httpHeaders = new HttpHeaders();
+		presignedUrl.requiredHeaders().forEach(httpHeaders::add);
+		HttpEntity<Void> httpEntity = new HttpEntity<>(httpHeaders);
+		String content = restTemplate.exchange(presignedUrl.url(), HttpMethod.GET, httpEntity, String.class).getBody();
+
+		// Generate presigned POST form for browser uploads
+		S3Request postRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.POST) // Note: Use POST for S3Request
+			.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+			.build();
+
+		PresignedPostForm postForm = postRequest.presignedPostForm(Duration.ofHours(1))
+			.maxFileSize(DataSize.ofMegabytes(10))
+			.addField("Content-Type", "text/plain")
+			.generate();
+
+		System.out.println("POST URL: " + postForm.url());
+		System.out.println("Form fields: " + postForm.formFields());
+
+		// Use the presigned POST form to upload a file
+		MultiValueMap<String, Object> formData = new LinkedMultiValueMap<>();
+		// Add all form fields from the presigned POST form
+		postForm.formFields().forEach(formData::add);
+		// Add the file content
+		String fileContent = "This is a test file uploaded via presigned POST form";
+		ByteArrayResource fileResource = new ByteArrayResource(fileContent.getBytes()) {
+			@Override
+			public String getFilename() {
+				return "file.txt";
+			}
+		};
+		formData.add("file", fileResource);
+
+		// POST the form data
+		HttpHeaders postHeaders = new HttpHeaders();
+		postHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+		HttpEntity<MultiValueMap<String, Object>> postEntity = new HttpEntity<>(formData, postHeaders);
+		restTemplate.postForEntity(postForm.url(), postEntity, Void.class);
+		System.out.println("File uploaded successfully via presigned POST form");
+
+		// Verify the uploaded file
+		S3Request verifyRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+			.build();
+		String uploadedContent = restTemplate.exchange(verifyRequest.toEntityBuilder().build(), String.class).getBody();
+		System.out.println("Uploaded content: " + uploadedContent);
+
+		// Clean up
 		S3Request deleteObjectRequest = s3Request().endpoint(endpoint)
 			.region(region)
 			.accessKeyId(accessKeyId)
@@ -107,6 +182,15 @@ public class ReadMeRestTemplate {
 			.path(b -> b.bucket(bucket).key("hello.txt"))
 			.build();
 		restTemplate.exchange(deleteObjectRequest.toEntityBuilder().build(), Void.class);
+
+		S3Request deleteUploadedFileRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.DELETE)
+			.path(b -> b.bucket(bucket).key("uploads/file.txt"))
+			.build();
+		restTemplate.exchange(deleteUploadedFileRequest.toEntityBuilder().build(), Void.class);
 
 		S3Request deleteBucketRequest = s3Request().endpoint(endpoint)
 			.region(region)
