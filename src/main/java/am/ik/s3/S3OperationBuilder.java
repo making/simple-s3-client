@@ -1,8 +1,13 @@
 package am.ik.s3;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -219,6 +224,45 @@ public class S3OperationBuilder {
 		}
 
 		/**
+		 * Puts (uploads) an object with InputStream content for streaming uploads.
+		 * @param inputStream The InputStream to upload
+		 * @param contentLength The length of the content in bytes
+		 * @return true if the object was uploaded successfully
+		 * @since 0.3.0
+		 */
+		public boolean putStream(InputStream inputStream, long contentLength) {
+			return putStream(inputStream, contentLength, MediaType.APPLICATION_OCTET_STREAM);
+		}
+
+		/**
+		 * Puts (uploads) an object with InputStream content and specified MIME type for
+		 * streaming uploads.
+		 * @param inputStream The InputStream to upload
+		 * @param contentLength The length of the content in bytes
+		 * @param mediaType The media type of the content
+		 * @return true if the object was uploaded successfully
+		 * @since 0.3.0
+		 */
+		public boolean putStream(InputStream inputStream, long contentLength, MediaType mediaType) {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.PUT)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.content(S3Content.ofStream(contentLength, mediaType))
+				.build();
+
+			restClient.put().uri(request.uri()).headers(request.headers()).body(new InputStreamResource(inputStream) {
+				@Override
+				public long contentLength() {
+					return contentLength;
+				}
+			}).retrieve().toBodilessEntity();
+			return true;
+		}
+
+		/**
 		 * Gets (downloads) an object as a string.
 		 * @return The object content as a string
 		 */
@@ -246,6 +290,70 @@ public class S3OperationBuilder {
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.build();
 			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(byte[].class);
+		}
+
+		/**
+		 * Gets (downloads) an object as an InputStream for streaming.
+		 * @return The object content as an InputStream
+		 * @since 0.3.0
+		 */
+		public InputStream getAsStream() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+			try {
+				org.springframework.core.io.Resource resource = restClient.get()
+					.uri(request.uri())
+					.headers(request.headers())
+					.retrieve()
+					.body(org.springframework.core.io.Resource.class);
+				return resource != null ? resource.getInputStream() : null;
+			}
+			catch (Exception e) {
+				throw new RuntimeException("Failed to get stream", e);
+			}
+		}
+
+		/**
+		 * Gets (downloads) a portion of an object as an InputStream for streaming.
+		 * @param rangeStart the starting byte position (inclusive)
+		 * @param rangeEnd the ending byte position (inclusive)
+		 * @return The object content as an InputStream for the specified range
+		 * @since 0.3.0
+		 */
+		public InputStream getAsStream(long rangeStart, long rangeEnd) {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withRange(rangeStart, rangeEnd);
+			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(InputStream.class);
+		}
+
+		/**
+		 * Gets (downloads) an object starting from a specific byte position as an
+		 * InputStream for streaming.
+		 * @param rangeStart the starting byte position (inclusive)
+		 * @return The object content as an InputStream from the specified start position
+		 * @since 0.3.0
+		 */
+		public InputStream getAsStreamFrom(long rangeStart) {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withRangeFrom(rangeStart);
+			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(InputStream.class);
 		}
 
 		/**
@@ -350,6 +458,28 @@ public class S3OperationBuilder {
 			return new MultipartUploadBuilder(bucketName, objectKey);
 		}
 
+		/**
+		 * Creates a range request builder for partial content retrieval.
+		 * @param rangeStart the starting byte position (inclusive)
+		 * @param rangeEnd the ending byte position (inclusive)
+		 * @return a new RangeRequestBuilder instance
+		 * @since 0.3.0
+		 */
+		public RangeRequestBuilder range(long rangeStart, long rangeEnd) {
+			return new RangeRequestBuilder(bucketName, objectKey, rangeStart, rangeEnd);
+		}
+
+		/**
+		 * Creates a range request builder for partial content retrieval from a starting
+		 * position.
+		 * @param rangeStart the starting byte position (inclusive)
+		 * @return a new RangeRequestBuilder instance
+		 * @since 0.3.0
+		 */
+		public RangeRequestBuilder rangeFrom(long rangeStart) {
+			return new RangeRequestBuilder(bucketName, objectKey, rangeStart, null);
+		}
+
 	}
 
 	/**
@@ -451,7 +581,7 @@ public class S3OperationBuilder {
 		 * @param contentLength the total length of the data
 		 * @return the result of the completed multipart upload
 		 */
-		public CompleteMultipartUploadResult upload(java.io.InputStream inputStream, long contentLength) {
+		public CompleteMultipartUploadResult upload(InputStream inputStream, long contentLength) {
 			return createMultipartUpload().upload(inputStream, contentLength);
 		}
 
@@ -460,7 +590,7 @@ public class S3OperationBuilder {
 		 * @param data the data to upload
 		 * @return a CompletableFuture that will complete with the upload result
 		 */
-		public java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> uploadAsync(byte[] data) {
+		public CompletableFuture<CompleteMultipartUploadResult> uploadAsync(byte[] data) {
 			return createMultipartUpload().uploadAsync(data);
 		}
 
@@ -470,8 +600,8 @@ public class S3OperationBuilder {
 		 * @param contentLength the total length of the data
 		 * @return a CompletableFuture that will complete with the upload result
 		 */
-		public java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> uploadAsync(
-				java.io.InputStream inputStream, long contentLength) {
+		public CompletableFuture<CompleteMultipartUploadResult> uploadAsync(InputStream inputStream,
+				long contentLength) {
 			return createMultipartUpload().uploadAsync(inputStream, contentLength);
 		}
 
@@ -485,6 +615,103 @@ public class S3OperationBuilder {
 				.build();
 
 			return new MultipartUpload(restClient, baseRequest, configuration, progressCallback);
+		}
+
+	}
+
+	/**
+	 * Builder class for range request operations.
+	 */
+	public class RangeRequestBuilder {
+
+		private final String bucketName;
+
+		private final String objectKey;
+
+		private final Long rangeStart;
+
+		private final Long rangeEnd;
+
+		private RangeRequestBuilder(String bucketName, String objectKey, Long rangeStart, Long rangeEnd) {
+			this.bucketName = bucketName;
+			this.objectKey = objectKey;
+			this.rangeStart = rangeStart;
+			this.rangeEnd = rangeEnd;
+		}
+
+		/**
+		 * Gets the partial content as an InputStream for streaming.
+		 * @return The partial object content as an InputStream
+		 */
+		public InputStream getAsStream() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+
+			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
+					: request.withRangeFrom(rangeStart);
+
+			try {
+				org.springframework.core.io.Resource resource = restClient.get()
+					.uri(rangeRequest.uri())
+					.headers(rangeRequest.headers())
+					.retrieve()
+					.body(org.springframework.core.io.Resource.class);
+				return resource != null ? resource.getInputStream() : null;
+			}
+			catch (Exception e) {
+				throw new RuntimeException("Failed to get stream", e);
+			}
+		}
+
+		/**
+		 * Gets the partial content as a byte array.
+		 * @return The partial object content as a byte array
+		 */
+		public byte[] getAsBytes() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+
+			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
+					: request.withRangeFrom(rangeStart);
+
+			return restClient.get()
+				.uri(rangeRequest.uri())
+				.headers(rangeRequest.headers())
+				.retrieve()
+				.body(byte[].class);
+		}
+
+		/**
+		 * Gets the partial content as a string.
+		 * @return The partial object content as a string
+		 */
+		public String get() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+
+			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
+					: request.withRangeFrom(rangeStart);
+
+			return restClient.get()
+				.uri(rangeRequest.uri())
+				.headers(rangeRequest.headers())
+				.retrieve()
+				.body(String.class);
 		}
 
 	}

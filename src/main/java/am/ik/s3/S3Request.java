@@ -61,6 +61,8 @@ public final class S3Request {
 
 	private final Clock clock;
 
+	private final Map<String, String> additionalHeaders;
+
 	/**
 	 * The AWS Signature Version 4 algorithm identifier.
 	 */
@@ -81,13 +83,14 @@ public final class S3Request {
 	 * @param method the HTTP method for the request
 	 * @param path the path builder function
 	 * @param canonicalQueryString the canonical query string
-	 * @param content the request content
+	 * @param content the request content (can be ByteArrayS3Content or StreamS3Content)
 	 * @param clock the clock to use for timestamps
+	 * @param additionalHeaders additional HTTP headers to include in the request
 	 */
 	@Builder(style = BuilderStyle.STAGED)
 	public S3Request(URI endpoint, String region, String accessKeyId, String secretAccessKey, HttpMethod method,
 			Function<S3PathBuilder, S3PathBuilder> path, @Opt String canonicalQueryString, @Opt S3Content content,
-			@Opt Clock clock) {
+			@Opt Clock clock, @Opt Map<String, String> additionalHeaders) {
 		this.endpoint = endpoint;
 		this.region = region;
 		this.accessKeyId = accessKeyId;
@@ -103,13 +106,20 @@ public final class S3Request {
 		this.canonicalQueryString = Objects.requireNonNullElse(canonicalQueryString, "");
 		this.content = content;
 		this.clock = Objects.requireNonNullElseGet(clock, Clock::systemUTC);
+		this.additionalHeaders = Objects.requireNonNullElse(additionalHeaders, Map.of());
 		this.init();
 	}
 
 	private void init() {
 		AmzDate amzDate = new AmzDate(this.clock.instant());
-		String contentSha256 = content == null ? UNSIGNED_PAYLOAD
-				: S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.sha256Hash(content.body()));
+		String contentSha256;
+		// Determine content SHA256 based on content type using pattern matching
+		if (content instanceof S3Content.ByteArrayS3Content byteArrayContent) {
+			contentSha256 = S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.sha256Hash(byteArrayContent.body()));
+		}
+		else {
+			contentSha256 = UNSIGNED_PAYLOAD;
+		}
 		TreeMap<String, String> headers = new TreeMap<>();
 		StringBuilder host = new StringBuilder(this.endpoint.getHost());
 		if (this.endpoint.getPort() != -1) {
@@ -118,12 +128,25 @@ public final class S3Request {
 		headers.put(HttpHeaders.HOST, host.toString());
 		headers.put(AmzHttpHeaders.X_AMZ_CONTENT_SHA256, contentSha256);
 		headers.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
-		if (content != null && content.body() != null) {
-			headers.put(HttpHeaders.CONTENT_LENGTH, String.valueOf(content.body().length));
+
+		// Handle content headers based on content type
+		if (content != null) {
+			if (content instanceof S3Content.ByteArrayS3Content byteArrayContent) {
+				headers.put(HttpHeaders.CONTENT_LENGTH, String.valueOf(byteArrayContent.body().length));
+				if (byteArrayContent.mediaType() != null) {
+					headers.put(HttpHeaders.CONTENT_TYPE, byteArrayContent.mediaType().toString());
+				}
+			}
+			else if (content instanceof S3Content.StreamS3Content streamContent) {
+				headers.put(HttpHeaders.CONTENT_LENGTH, String.valueOf(streamContent.contentLength()));
+				if (streamContent.mediaType() != null) {
+					headers.put(HttpHeaders.CONTENT_TYPE, streamContent.mediaType().toString());
+				}
+			}
 		}
-		if (content != null && content.mediaType() != null) {
-			headers.put(HttpHeaders.CONTENT_TYPE, content.mediaType().toString());
-		}
+
+		// Add additional headers to the signing headers
+		headers.putAll(additionalHeaders);
 		String authorization = this.authorization(headers, contentSha256, amzDate);
 		this.httpHeaders = new HttpHeaders();
 		headers.forEach(this.httpHeaders::add);
@@ -409,6 +432,64 @@ public final class S3Request {
 			.method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(queryString)
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for streaming object download with Range header support.
+	 * @param rangeStart the starting byte position (inclusive)
+	 * @param rangeEnd the ending byte position (inclusive)
+	 * @return a new S3Request configured for streaming GET operation with Range header
+	 * @since 0.3.0
+	 */
+	public S3Request withRange(long rangeStart, long rangeEnd) {
+		if (rangeStart < 0 || rangeEnd < 0 || rangeStart > rangeEnd) {
+			throw new IllegalArgumentException("Invalid range: start=%d, end=%d".formatted(rangeStart, rangeEnd));
+		}
+
+		String rangeHeader = "bytes=%d-%d".formatted(rangeStart, rangeEnd);
+		Map<String, String> rangeHeaders = new TreeMap<>(this.additionalHeaders);
+		rangeHeaders.put("Range", rangeHeader);
+
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(this.canonicalQueryString)
+			.content(this.content)
+			.additionalHeaders(rangeHeaders)
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for streaming object download with Range header support
+	 * (from start to end of file).
+	 * @param rangeStart the starting byte position (inclusive)
+	 * @return a new S3Request configured for streaming GET operation with Range header
+	 * @since 0.3.0
+	 */
+	public S3Request withRangeFrom(long rangeStart) {
+		if (rangeStart < 0) {
+			throw new IllegalArgumentException("Invalid range start: " + rangeStart);
+		}
+
+		String rangeHeader = "bytes=%d-".formatted(rangeStart);
+		Map<String, String> rangeHeaders = new TreeMap<>(this.additionalHeaders);
+		rangeHeaders.put("Range", rangeHeader);
+
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(this.canonicalQueryString)
+			.content(this.content)
+			.additionalHeaders(rangeHeaders)
 			.build();
 	}
 

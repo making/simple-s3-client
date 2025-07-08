@@ -178,9 +178,10 @@ public final class S3Client {
 		 * @return A configured RestClient instance
 		 */
 		private static RestClient createDefaultRestClient() {
-			return RestClient.builder()
-				.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
-				.build();
+			return RestClient.builder().messageConverters(converters -> {
+				converters.add(new MappingJackson2XmlHttpMessageConverter());
+				converters.add(new org.springframework.http.converter.ResourceHttpMessageConverter());
+			}).build();
 		}
 
 	}
