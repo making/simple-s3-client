@@ -19,6 +19,9 @@ This library provides two ways to interact with S3:
 The `S3Client` provides a modern, fluent API for S3 operations with method chaining.
 
 ```java
+import java.time.Duration;
+import am.ik.s3.*;
+
 // Create client with default RestClient configuration
 S3Client client = S3Client.builder()
     .endpoint("https://s3.amazonaws.com")
@@ -53,6 +56,32 @@ String content = client.bucket("my-bucket").object("hello.txt").get();
 System.out.println("Content: " + content); // Content: Hello World!
 
 byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
+
+// Generate presigned URLs for secure access
+PresignedUrl getUrl = client.bucket("my-bucket")
+    .object("hello.txt")
+    .presignedUrl()
+    .expiration(Duration.ofHours(2))
+    .forGet();
+System.out.println("Get URL: " + getUrl.url());
+
+PresignedUrl putUrl = client.bucket("my-bucket")
+    .object("upload.txt")
+    .presignedUrl()
+    .expiration(Duration.ofMinutes(15))
+    .contentType("text/plain")
+    .forPut();
+System.out.println("Put URL: " + putUrl.url());
+
+// Generate presigned POST form for browser uploads
+PresignedPostForm postForm = client.bucket("my-bucket")
+    .object("uploads/${filename}")
+    .presignedPostForm()
+    .expiration(Duration.ofHours(1))
+    .maxFileSize(DataSize.ofMegabytes(10))
+    .generate();
+System.out.println("POST URL: " + postForm.url());
+System.out.println("Form fields: " + postForm.formFields());
 
 // Clean up
 client.bucket("my-bucket").object("hello.txt").delete();
@@ -153,6 +182,35 @@ S3Request deleteBucketRequest = s3Request().endpoint(endpoint)
 	.path(b -> b.bucket(bucket))
 	.build();
 restTemplate.exchange(deleteBucketRequest.toEntityBuilder().build(), Void.class);
+
+// Generate presigned URL for GET operation
+S3Request getRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build();
+
+PresignedUrl presignedUrl = getRequest.generatePresignedUrl(Duration.ofHours(1));
+System.out.println("Presigned URL: " + presignedUrl.url());
+
+// Use the presigned URL with RestTemplate
+HttpHeaders httpHeaders = new HttpHeaders();
+presignedUrl.requiredHeaders().forEach(httpHeaders::add);
+HttpEntity<Void> httpEntity = new HttpEntity<>(httpHeaders);
+String content = restTemplate.exchange(presignedUrl.url(), HttpMethod.GET, httpEntity, String.class).getBody();
+
+// Generate presigned POST form for browser uploads
+S3ClientConfiguration config = new S3ClientConfiguration(endpoint, region, accessKeyId, secretAccessKey);
+PresignedPostForm postForm = PresignedPostForm.builder(config, bucket, "uploads/file.txt")
+	.expiration(Duration.ofHours(1))
+	.maxFileSize(DataSize.ofMegabytes(10))
+	.field("Content-Type", "text/plain")
+	.generate();
+
+System.out.println("POST URL: " + postForm.url());
+System.out.println("Form fields: " + postForm.formFields());
 ```
 
 ## Examples with `RestClient` (Low-level API)
@@ -268,6 +326,36 @@ restClient.delete()
 	.headers(deleteBucketRequest.headers())
 	.retrieve()
 	.toBodilessEntity();
+
+// Generate presigned URL for GET operation
+S3Request getRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build();
+
+PresignedUrl presignedUrl = getRequest.generatePresignedUrl(Duration.ofHours(1));
+System.out.println("Presigned URL: " + presignedUrl.url());
+
+// Use the presigned URL
+String content = restClient.get()
+	.uri(presignedUrl.url())
+	.headers(presignedUrl.headers())
+	.retrieve()
+	.body(String.class);
+
+// Generate presigned POST form for browser uploads
+S3ClientConfiguration config = new S3ClientConfiguration(endpoint, region, accessKeyId, secretAccessKey);
+PresignedPostForm postForm = PresignedPostForm.builder(config, bucket, "uploads/file.txt")
+	.expiration(Duration.ofHours(1))
+	.maxFileSize(DataSize.ofMegabytes(10))
+	.field("Content-Type", "text/plain")
+	.generate();
+
+System.out.println("POST URL: " + postForm.url());
+System.out.println("Form fields: " + postForm.formFields());
 ```
 
 ## API Overview
@@ -298,6 +386,24 @@ restClient.delete()
 - `.get()` - Download as string
 - `.getAsBytes()` - Download as byte array
 - `.delete()` - Delete the object
+
+#### Presigned URL Operations
+- `.presignedUrl()` - Create a presigned URL builder
+- `.expiration(Duration)` - Set expiration time for the URL
+- `.contentType(String)` - Set content type for PUT operations
+- `.header(String, String)` - Add custom headers
+- `.parameter(String, String)` - Add query parameters
+- `.forGet()` - Generate presigned URL for GET operation
+- `.forPut()` - Generate presigned URL for PUT operation
+- `.forDelete()` - Generate presigned URL for DELETE operation
+
+#### Presigned POST Form Operations
+- `.presignedPostForm()` - Create a presigned POST form builder
+- `.expiration(Duration)` - Set expiration time for the form
+- `.maxFileSize(DataSize)` - Set maximum file size in bytes
+- `.field(String, String)` - Add form field
+- `.condition(String)` - Add policy condition
+- `.generate()` - Generate the presigned POST form
 
 ### When to Use Which API
 

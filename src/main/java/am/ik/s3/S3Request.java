@@ -16,20 +16,17 @@
 package am.ik.s3;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.util.HexFormat;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.jilt.Builder;
 import org.jilt.BuilderStyle;
@@ -104,7 +101,8 @@ public final class S3Request {
 
 	private void init() {
 		AmzDate amzDate = new AmzDate(this.clock.instant());
-		String contentSha256 = content == null ? UNSIGNED_PAYLOAD : encodeHex(sha256Hash(content.body()));
+		String contentSha256 = content == null ? UNSIGNED_PAYLOAD
+				: S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.sha256Hash(content.body()));
 		TreeMap<String, String> headers = new TreeMap<>();
 		StringBuilder host = new StringBuilder(this.endpoint.getHost());
 		if (this.endpoint.getPort() != -1) {
@@ -168,7 +166,8 @@ public final class S3Request {
 				signedHeaders, payloadHash);
 		// Step 2: Create a hash of the canonical request
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-canonical-request-hash
-		String hashedCanonicalRequest = encodeHex(sha256Hash(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
+		String hashedCanonicalRequest = S3RequestSigningUtils
+			.encodeHex(S3RequestSigningUtils.sha256Hash(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
 		// Step 3: Create a string to sign
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-string-to-sign
 		String credentialScope = "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
@@ -186,43 +185,99 @@ public final class S3Request {
 
 	private String sign(String stringToSign, AmzDate amzDate) {
 		byte[] kSecret = ("AWS4" + this.secretAccessKey).getBytes(StandardCharsets.UTF_8);
-		byte[] kDate = hmacSHA256(amzDate.yymmdd(), kSecret);
-		byte[] kRegion = hmacSHA256(this.region, kDate);
-		byte[] kService = hmacSHA256("s3", kRegion);
-		byte[] kSigning = hmacSHA256("aws4_request", kService);
-		return encodeHex(hmacSHA256(stringToSign, kSigning));
+		byte[] kDate = S3RequestSigningUtils.hmacSHA256(amzDate.yymmdd(), kSecret);
+		byte[] kRegion = S3RequestSigningUtils.hmacSHA256(this.region, kDate);
+		byte[] kService = S3RequestSigningUtils.hmacSHA256("s3", kRegion);
+		byte[] kSigning = S3RequestSigningUtils.hmacSHA256("aws4_request", kService);
+		return S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.hmacSHA256(stringToSign, kSigning));
 	}
 
-	private static byte[] sha256Hash(byte[] data) {
-		try {
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			return md.digest(data);
-		}
-		catch (NoSuchAlgorithmException e) {
-			// should not happen
-			throw new IllegalStateException(e);
-		}
+	/**
+	 * Generates a presigned URL for this S3 request.
+	 * @param expiration the duration until the URL expires
+	 * @return a PresignedUrl containing the URL and expiration information
+	 * @since 0.3.0
+	 */
+	public PresignedUrl generatePresignedUrl(Duration expiration) {
+		return generatePresignedUrl(expiration, null);
 	}
 
-	private static byte[] hmacSHA256(String data, byte[] key) {
-		try {
-			Mac mac = Mac.getInstance("HmacSHA256");
-			mac.init(new SecretKeySpec(key, "HmacSHA256"));
-			return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+	/**
+	 * Generates a presigned URL for this S3 request with additional headers.
+	 * @param expiration the duration until the URL expires
+	 * @param additionalHeaders additional headers to include in the presigned URL
+	 * @return a PresignedUrl containing the URL and expiration information
+	 * @since 0.3.0
+	 */
+	public PresignedUrl generatePresignedUrl(Duration expiration, Map<String, String> additionalHeaders) {
+		Instant expirationTime = clock.instant().plus(expiration);
+		AmzDate amzDate = new AmzDate(clock.instant());
+		String credentialScope = "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
+		String credential = "%s/%s".formatted(this.accessKeyId, credentialScope);
+
+		TreeMap<String, String> queryParams = new TreeMap<>();
+		queryParams.put("X-Amz-Algorithm", AWS4_HMAC_SHA256);
+		queryParams.put("X-Amz-Credential", credential);
+		queryParams.put("X-Amz-Date", amzDate.date());
+		queryParams.put("X-Amz-Expires", String.valueOf(expiration.getSeconds()));
+		queryParams.put("X-Amz-SignedHeaders", "host");
+
+		if (!canonicalQueryString.isEmpty()) {
+			String[] pairs = canonicalQueryString.split("&");
+			for (String pair : pairs) {
+				String[] parts = pair.split("=", 2);
+				if (parts.length == 2) {
+					queryParams.put(parts[0], parts[1]);
+				}
+			}
 		}
-		catch (NoSuchAlgorithmException | InvalidKeyException e) {
-			// should not happen
-			throw new IllegalStateException(e);
+
+		TreeMap<String, String> headers = new TreeMap<>();
+		StringBuilder host = new StringBuilder(this.endpoint.getHost());
+		if (this.endpoint.getPort() != -1) {
+			host.append(":").append(this.endpoint.getPort());
 		}
+		headers.put(HttpHeaders.HOST, host.toString());
+
+		if (additionalHeaders != null) {
+			headers.putAll(additionalHeaders);
+			String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+			queryParams.put("X-Amz-SignedHeaders", signedHeaders);
+		}
+
+		String canonicalQueryStringForSigning = queryParams.entrySet()
+			.stream()
+			.map(e -> urlEncode(e.getKey()) + "=" + urlEncode(e.getValue()))
+			.collect(Collectors.joining("&"));
+
+		String canonicalHeaders = headers.entrySet()
+			.stream()
+			.map(e -> "%s:%s".formatted(e.getKey().toLowerCase(), e.getValue()))
+			.collect(Collectors.joining("\n")) + "\n";
+		String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+
+		String canonicalRequest = String.join("\n", method.name(), canonicalUri, canonicalQueryStringForSigning,
+				canonicalHeaders, signedHeaders, UNSIGNED_PAYLOAD);
+
+		String hashedCanonicalRequest = S3RequestSigningUtils
+			.encodeHex(S3RequestSigningUtils.sha256Hash(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
+		String stringToSign = String.join("\n", AWS4_HMAC_SHA256, amzDate.date(), credentialScope,
+				hashedCanonicalRequest);
+		String signature = this.sign(stringToSign, amzDate);
+
+		queryParams.put("X-Amz-Signature", signature);
+
+		UriComponentsBuilder builder = UriComponentsBuilder.fromUri(this.endpoint).path(canonicalUri);
+
+		queryParams.forEach(builder::queryParam);
+
+		URI presignedUri = builder.build().toUri();
+
+		return new PresignedUrl(presignedUri, expirationTime, additionalHeaders != null ? additionalHeaders : Map.of());
 	}
 
-	private static String encodeHex(byte[] data) {
-		HexFormat hex = HexFormat.of();
-		StringBuilder sb = new StringBuilder();
-		for (byte datum : data) {
-			sb.append(hex.toHexDigits(datum));
-		}
-		return sb.toString();
+	private static String urlEncode(String value) {
+		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
 	}
 
 	@Override

@@ -260,6 +260,24 @@ public class S3OperationBuilder {
 			return true;
 		}
 
+		/**
+		 * Creates a presigned URL builder for this object.
+		 * @return a new PresignedUrl.Builder instance
+		 * @since 0.3.0
+		 */
+		public PresignedUrl.Builder presignedUrl() {
+			return PresignedUrl.builder(configuration, bucketName, objectKey);
+		}
+
+		/**
+		 * Creates a presigned POST form builder for this object.
+		 * @return a new PresignedPostForm.Builder instance
+		 * @since 0.3.0
+		 */
+		public PresignedPostForm.Builder presignedPostForm() {
+			return PresignedPostForm.builder(configuration, bucketName, objectKey);
+		}
+
 	}
 
 }
