@@ -276,6 +276,145 @@ class MultipartUploadIntegrationTest {
 		}
 	}
 
+	@Test
+	void testMultipartUploadAsync() throws Exception {
+		String objectKey = "async-multipart-file.txt";
+
+		// Create a 10MB file (2 parts of 5MB each)
+		byte[] data = createTestData(10 * 1024 * 1024);
+
+		// Track progress
+		AtomicInteger completedParts = new AtomicInteger(0);
+		AtomicLong totalBytesTransferred = new AtomicLong(0);
+		AtomicLong uploadCompletedTotalBytes = new AtomicLong(0);
+
+		ProgressCallback progressCallback = new ProgressCallback() {
+			@Override
+			public void onPartCompleted(int partNumber, long bytesTransferred) {
+				completedParts.incrementAndGet();
+				totalBytesTransferred.addAndGet(bytesTransferred);
+			}
+
+			@Override
+			public void onUploadCompleted(long totalBytes) {
+				uploadCompletedTotalBytes.set(totalBytes);
+			}
+
+			@Override
+			public void onError(Exception error) {
+				throw new RuntimeException("Async upload failed", error);
+			}
+		};
+
+		// Perform asynchronous multipart upload
+		java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
+			.object(objectKey)
+			.multipartUpload()
+			.partSize(DataSize.ofMegabytes(5))
+			.maxConcurrentUploads(2)
+			.progressCallback(progressCallback)
+			.uploadAsync(data);
+
+		// Wait for completion
+		CompleteMultipartUploadResult result = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+		// Verify the upload
+		assertThat(result).isNotNull();
+		assertThat(result.bucket()).isEqualTo(bucketName);
+		assertThat(result.key()).isEqualTo(objectKey);
+		assertThat(result.etag()).isNotNull();
+
+		// Verify progress tracking
+		assertThat(completedParts.get()).isEqualTo(2); // 2 parts
+		assertThat(totalBytesTransferred.get()).isEqualTo(data.length);
+		assertThat(uploadCompletedTotalBytes.get()).isEqualTo(data.length);
+
+		// Verify the uploaded content
+		byte[] downloadedData = client.bucket(bucketName).object(objectKey).getAsBytes();
+		assertThat(downloadedData).isEqualTo(data);
+
+		// Verify data integrity with MD5 hash
+		String originalMd5 = calculateMd5(data);
+		String downloadedMd5 = calculateMd5(downloadedData);
+		assertThat(downloadedMd5).isEqualTo(originalMd5);
+
+		// Clean up
+		client.bucket(bucketName).object(objectKey).delete();
+	}
+
+	@Test
+	void testMultipartUploadAsyncWithCustomExecutor() throws Exception {
+		String objectKey = "async-executor-multipart-file.txt";
+
+		// Create a 8MB file
+		byte[] data = createTestData(8 * 1024 * 1024);
+
+		// Create custom executor
+		java.util.concurrent.ExecutorService customExecutor = java.util.concurrent.Executors.newFixedThreadPool(1);
+
+		try {
+			// Track progress
+			AtomicInteger completedParts = new AtomicInteger(0);
+			AtomicLong uploadCompletedTotalBytes = new AtomicLong(0);
+
+			ProgressCallback progressCallback = new ProgressCallback() {
+				@Override
+				public void onPartCompleted(int partNumber, long bytesTransferred) {
+					completedParts.incrementAndGet();
+				}
+
+				@Override
+				public void onUploadCompleted(long totalBytes) {
+					uploadCompletedTotalBytes.set(totalBytes);
+				}
+
+				@Override
+				public void onError(Exception error) {
+					throw new RuntimeException("Async upload with custom executor failed", error);
+				}
+			};
+
+			// Perform asynchronous multipart upload with custom executor
+			java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
+				.object(objectKey)
+				.multipartUpload()
+				.partSize(DataSize.ofMegabytes(5))
+				.maxConcurrentUploads(1)
+				.executor(customExecutor)
+				.progressCallback(progressCallback)
+				.uploadAsync(data);
+
+			// Wait for completion
+			CompleteMultipartUploadResult result = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+			// Verify the upload
+			assertThat(result).isNotNull();
+			assertThat(result.bucket()).isEqualTo(bucketName);
+			assertThat(result.key()).isEqualTo(objectKey);
+			assertThat(result.etag()).isNotNull();
+
+			// Verify progress tracking
+			assertThat(completedParts.get()).isEqualTo(2); // 2 parts (8MB / 5MB = 2
+															// parts)
+			assertThat(uploadCompletedTotalBytes.get()).isEqualTo(data.length);
+
+			// Verify the uploaded content
+			byte[] downloadedData = client.bucket(bucketName).object(objectKey).getAsBytes();
+			assertThat(downloadedData).isEqualTo(data);
+
+			// Verify data integrity with MD5 hash
+			String originalMd5 = calculateMd5(data);
+			String downloadedMd5 = calculateMd5(downloadedData);
+			assertThat(downloadedMd5).isEqualTo(originalMd5);
+
+		}
+		finally {
+			// Clean up
+			client.bucket(bucketName).object(objectKey).delete();
+			customExecutor.shutdown();
+		}
+	}
+
 	private byte[] createTestData(int size) {
 		StringBuilder sb = new StringBuilder();
 		String pattern = "This is a test line for multipart upload testing. ";
