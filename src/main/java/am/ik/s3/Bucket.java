@@ -19,6 +19,12 @@ import java.time.OffsetDateTime;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
+/**
+ * Represents an S3 bucket with its name and creation date.
+ *
+ * @param name the name of the bucket
+ * @param creationDate the date and time when the bucket was created
+ */
 public record Bucket(@JacksonXmlProperty(localName = "Name") String name,
 		@JacksonXmlProperty(localName = "CreationDate") OffsetDateTime creationDate) {
 }

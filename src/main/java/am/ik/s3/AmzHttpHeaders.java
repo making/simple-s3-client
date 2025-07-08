@@ -15,10 +15,19 @@
  */
 package am.ik.s3;
 
+/**
+ * Constants for Amazon S3 HTTP headers.
+ */
 public class AmzHttpHeaders {
 
 	static final String X_AMZ_CONTENT_SHA256 = "X-Amz-Content-Sha256";
 
 	static final String X_AMZ_DATE = "X-Amz-Date";
+
+	/**
+	 * Private constructor to prevent instantiation of this utility class.
+	 */
+	private AmzHttpHeaders() {
+	}
 
 }

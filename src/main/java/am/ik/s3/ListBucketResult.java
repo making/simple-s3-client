@@ -21,6 +21,16 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
+/**
+ * Represents the result of listing objects in an S3 bucket.
+ *
+ * @param name the name of the bucket
+ * @param prefix the prefix used in the listing request
+ * @param marker the marker used for pagination
+ * @param maxKeys the maximum number of keys returned
+ * @param isTruncated indicates if the result was truncated
+ * @param contents the list of objects in the bucket
+ */
 @JacksonXmlRootElement(localName = "ListBucketResult")
 public record ListBucketResult(@JacksonXmlProperty(localName = "Name") String name,
 		@JacksonXmlProperty(localName = "Prefix") String prefix,

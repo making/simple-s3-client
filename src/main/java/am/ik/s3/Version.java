@@ -17,6 +17,18 @@ package am.ik.s3;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
+/**
+ * Represents a version of an S3 object.
+ *
+ * @param key the key (name) of the object
+ * @param lastModified the date and time when the version was last modified
+ * @param eTag the entity tag (ETag) of the version
+ * @param size the size of the version in bytes
+ * @param owner the owner of the version
+ * @param storageClass the storage class of the version
+ * @param isLatest indicates if this is the latest version
+ * @param versionId the version ID of the object
+ */
 public record Version(@JacksonXmlProperty(localName = "Key") String key,
 		@JacksonXmlProperty(localName = "LastModified") String lastModified,
 		@JacksonXmlProperty(localName = "ETag") String eTag, @JacksonXmlProperty(localName = "Size") int size,

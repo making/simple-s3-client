@@ -21,6 +21,9 @@ import org.jilt.Builder;
 
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * Represents an S3 path with bucket and key components.
+ */
 @Builder
 public final class S3Path {
 
@@ -30,12 +33,24 @@ public final class S3Path {
 
 	private final Boolean encodeKey;
 
+	/**
+	 * Creates a new S3Path.
+	 *
+	 * @param bucket the bucket name
+	 * @param key the object key
+	 * @param encodeKey whether to encode the key (defaults to true if null)
+	 */
 	public S3Path(String bucket, String key, Boolean encodeKey) {
 		this.bucket = bucket;
 		this.key = key;
 		this.encodeKey = Objects.requireNonNullElse(encodeKey, true);
 	}
 
+	/**
+	 * Converts this S3Path to a canonical URI string.
+	 *
+	 * @return the canonical URI representation
+	 */
 	public String toCanonicalUri() {
 		StringBuilder builder = new StringBuilder();
 		if (bucket == null || bucket.isEmpty()) {

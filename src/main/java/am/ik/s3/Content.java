@@ -19,6 +19,16 @@ import java.time.OffsetDateTime;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
+/**
+ * Represents an S3 object (content) within a bucket.
+ *
+ * @param key the key (name) of the object
+ * @param lastModified the date and time when the object was last modified
+ * @param etag the entity tag (ETag) of the object
+ * @param size the size of the object in bytes
+ * @param owner the owner of the object
+ * @param storageClass the storage class of the object
+ */
 public record Content(@JacksonXmlProperty(localName = "Key") String key,
 		@JacksonXmlProperty(localName = "LastModified") OffsetDateTime lastModified,
 		@JacksonXmlProperty(localName = "ETag") String etag, @JacksonXmlProperty(localName = "Size") long size,

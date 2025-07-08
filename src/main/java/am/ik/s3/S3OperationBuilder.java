@@ -162,7 +162,7 @@ public class S3OperationBuilder {
 		/**
 		 * Puts (uploads) an object with string content and specified MIME type.
 		 * @param content The content to upload
-		 * @param mimeType The MIME type of the content
+		 * @param mediaType The media type of the content
 		 * @return true if the object was uploaded successfully
 		 */
 		public boolean put(String content, MediaType mediaType) {
@@ -192,7 +192,7 @@ public class S3OperationBuilder {
 		/**
 		 * Puts (uploads) an object with byte array content and specified MIME type.
 		 * @param content The content to upload
-		 * @param mimeType The MIME type of the content
+		 * @param mediaType The media type of the content
 		 * @return true if the object was uploaded successfully
 		 */
 		public boolean put(byte[] content, MediaType mediaType) {

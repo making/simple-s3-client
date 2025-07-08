@@ -40,6 +40,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.RequestEntity;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * Represents an S3 request with AWS Signature Version 4 signing.
+ */
 public final class S3Request {
 
 	private final URI endpoint;
@@ -60,6 +63,9 @@ public final class S3Request {
 
 	private final Clock clock;
 
+	/**
+	 * The AWS Signature Version 4 algorithm identifier.
+	 */
 	public static final String AWS4_HMAC_SHA256 = "AWS4-HMAC-SHA256";
 
 	private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
@@ -68,6 +74,19 @@ public final class S3Request {
 
 	private HttpHeaders httpHeaders;
 
+	/**
+	 * Creates a new S3Request.
+	 *
+	 * @param endpoint the S3 endpoint URI
+	 * @param region the AWS region
+	 * @param accessKeyId the AWS access key ID
+	 * @param secretAccessKey the AWS secret access key
+	 * @param method the HTTP method for the request
+	 * @param path the path builder function
+	 * @param canonicalQueryString the canonical query string
+	 * @param content the request content
+	 * @param clock the clock to use for timestamps
+	 */
 	@Builder(style = BuilderStyle.STAGED)
 	public S3Request(URI endpoint, String region, String accessKeyId, String secretAccessKey, HttpMethod method,
 			Function<S3PathBuilder, S3PathBuilder> path, @Opt String canonicalQueryString, @Opt S3Content content,
@@ -112,14 +131,29 @@ public final class S3Request {
 			.toUri();
 	}
 
+	/**
+	 * Returns the complete URI for this S3 request.
+	 *
+	 * @return the request URI
+	 */
 	public URI uri() {
 		return this.uri;
 	}
 
+	/**
+	 * Returns a consumer that adds the necessary headers to an HTTP request.
+	 *
+	 * @return a header consumer
+	 */
 	public Consumer<HttpHeaders> headers() {
 		return headers -> headers.addAll(this.httpHeaders);
 	}
 
+	/**
+	 * Converts this S3 request to a Spring RequestEntity.BodyBuilder.
+	 *
+	 * @return a RequestEntity.BodyBuilder with the method, URI, and headers set
+	 */
 	public RequestEntity.BodyBuilder toEntityBuilder() {
 		return RequestEntity.method(this.method, this.uri).headers(this.httpHeaders);
 	}
