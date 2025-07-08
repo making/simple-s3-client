@@ -17,6 +17,12 @@ package am.ik.s3;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
+/**
+ * Represents the owner of an S3 bucket or object.
+ *
+ * @param id the canonical user ID of the owner
+ * @param displayName the display name of the owner
+ */
 public record Owner(@JacksonXmlProperty(localName = "ID") String id,
 		@JacksonXmlProperty(localName = "DisplayName") String displayName) {
 }

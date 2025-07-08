@@ -17,6 +17,18 @@ package am.ik.s3;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
+/**
+ * Represents a delete marker in S3 versioning.
+ *
+ * @param key the key (name) of the deleted object
+ * @param lastModified the date and time when the delete marker was created
+ * @param eTag the entity tag (ETag) of the delete marker
+ * @param size the size (always 0 for delete markers)
+ * @param owner the owner of the delete marker
+ * @param storageClass the storage class of the delete marker
+ * @param isLatest indicates if this is the latest version
+ * @param versionId the version ID of the delete marker
+ */
 public record DeleteMarker(@JacksonXmlProperty(localName = "Key") String key,
 		@JacksonXmlProperty(localName = "LastModified") String lastModified,
 		@JacksonXmlProperty(localName = "ETag") String eTag, @JacksonXmlProperty(localName = "Size") int size,

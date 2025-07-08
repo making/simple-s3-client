@@ -19,11 +19,29 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.http.MediaType;
 
+/**
+ * Represents content to be sent in an S3 request.
+ *
+ * @param body the content body as a byte array
+ * @param mediaType the media type of the content
+ */
 public record S3Content(byte[] body, MediaType mediaType) {
+	/**
+	 * Creates S3Content from a string.
+	 * @param body the content body as a string
+	 * @param mediaType the media type of the content
+	 * @return a new S3Content instance
+	 */
 	public static S3Content of(String body, MediaType mediaType) {
 		return new S3Content(body.getBytes(StandardCharsets.UTF_8), mediaType);
 	}
 
+	/**
+	 * Creates S3Content from a byte array.
+	 * @param body the content body as a byte array
+	 * @param mediaType the media type of the content
+	 * @return a new S3Content instance
+	 */
 	public static S3Content of(byte[] body, MediaType mediaType) {
 		return new S3Content(body, mediaType);
 	}

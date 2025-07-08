@@ -20,6 +20,12 @@ import java.util.List;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
+/**
+ * Represents the result of listing all S3 buckets owned by the authenticated sender.
+ *
+ * @param owner the owner of the buckets
+ * @param buckets the list of buckets
+ */
 @JacksonXmlRootElement(localName = "ListAllMyBucketsResult")
 public record ListBucketsResult(@JacksonXmlProperty(localName = "Owner") Owner owner,
 		@JacksonXmlProperty(localName = "Buckets") List<Bucket> buckets) {
