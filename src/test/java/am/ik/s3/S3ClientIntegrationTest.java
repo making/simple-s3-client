@@ -65,8 +65,7 @@ class S3ClientIntegrationTest {
 		String bucketName = "test-bucket";
 
 		// Create bucket
-		boolean created = client.bucket(bucketName).create();
-		assertThat(created).isTrue();
+		client.bucket(bucketName).create();
 
 		// Verify bucket exists
 		ListBucketsResult result = client.listBuckets();
@@ -74,8 +73,7 @@ class S3ClientIntegrationTest {
 		assertThat(result.buckets().get(0).name()).isEqualTo(bucketName);
 
 		// Delete bucket
-		boolean deleted = client.bucket(bucketName).delete();
-		assertThat(deleted).isTrue();
+		client.bucket(bucketName).delete();
 
 		// Verify bucket is deleted
 		result = client.listBuckets();
@@ -92,8 +90,7 @@ class S3ClientIntegrationTest {
 		client.bucket(bucketName).create();
 
 		// Put object
-		boolean putResult = client.bucket(bucketName).object(objectKey).put(content);
-		assertThat(putResult).isTrue();
+		client.bucket(bucketName).object(objectKey).put(content);
 
 		// Get object
 		String retrievedContent = client.bucket(bucketName).object(objectKey).get();
@@ -114,8 +111,7 @@ class S3ClientIntegrationTest {
 		client.bucket(bucketName).create();
 
 		// Put object
-		boolean putResult = client.bucket(bucketName).object(objectKey).put(content);
-		assertThat(putResult).isTrue();
+		client.bucket(bucketName).object(objectKey).put(content);
 
 		// Get object as bytes
 		byte[] retrievedContent = client.bucket(bucketName).object(objectKey).getAsBytes();
@@ -168,8 +164,7 @@ class S3ClientIntegrationTest {
 		assertThat(result.contents()).hasSize(1);
 
 		// Delete object
-		boolean deleted = client.bucket(bucketName).object(objectKey).delete();
-		assertThat(deleted).isTrue();
+		client.bucket(bucketName).object(objectKey).delete();
 
 		// Verify object is deleted
 		result = client.bucket(bucketName).listObjects();
