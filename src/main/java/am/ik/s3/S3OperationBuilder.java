@@ -1,13 +1,11 @@
 package am.ik.s3;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -88,9 +86,8 @@ public class S3OperationBuilder {
 
 		/**
 		 * Creates the bucket.
-		 * @return true if the bucket was created successfully
 		 */
-		public boolean create() {
+		public void create() {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -100,15 +97,12 @@ public class S3OperationBuilder {
 				.build();
 
 			restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
-
-			return true;
 		}
 
 		/**
 		 * Deletes the bucket.
-		 * @return true if the bucket was deleted successfully
 		 */
-		public boolean delete() {
+		public void delete() {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -118,8 +112,6 @@ public class S3OperationBuilder {
 				.build();
 
 			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
-
-			return true;
 		}
 
 		/**
@@ -170,19 +162,17 @@ public class S3OperationBuilder {
 		/**
 		 * Puts (uploads) an object with string content.
 		 * @param content The content to upload
-		 * @return true if the object was uploaded successfully
 		 */
-		public boolean put(String content) {
-			return put(content, MediaType.TEXT_PLAIN);
+		public void put(String content) {
+			put(content, MediaType.TEXT_PLAIN);
 		}
 
 		/**
 		 * Puts (uploads) an object with string content and specified MIME type.
 		 * @param content The content to upload
 		 * @param mediaType The media type of the content
-		 * @return true if the object was uploaded successfully
 		 */
-		public boolean put(String content, MediaType mediaType) {
+		public void put(String content, MediaType mediaType) {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -192,25 +182,22 @@ public class S3OperationBuilder {
 				.content(S3Content.of(content, mediaType))
 				.build();
 			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
-			return true;
 		}
 
 		/**
 		 * Puts (uploads) an object with byte array content.
 		 * @param content The content to upload
-		 * @return true if the object was uploaded successfully
 		 */
-		public boolean put(byte[] content) {
-			return put(content, MediaType.APPLICATION_OCTET_STREAM);
+		public void put(byte[] content) {
+			put(content, MediaType.APPLICATION_OCTET_STREAM);
 		}
 
 		/**
 		 * Puts (uploads) an object with byte array content and specified MIME type.
 		 * @param content The content to upload
 		 * @param mediaType The media type of the content
-		 * @return true if the object was uploaded successfully
 		 */
-		public boolean put(byte[] content, MediaType mediaType) {
+		public void put(byte[] content, MediaType mediaType) {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -220,18 +207,16 @@ public class S3OperationBuilder {
 				.content(S3Content.of(content, mediaType))
 				.build();
 			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
-			return true;
 		}
 
 		/**
 		 * Puts (uploads) an object with InputStream content for streaming uploads.
 		 * @param inputStream The InputStream to upload
 		 * @param contentLength The length of the content in bytes
-		 * @return true if the object was uploaded successfully
 		 * @since 0.3.0
 		 */
-		public boolean putStream(InputStream inputStream, long contentLength) {
-			return putStream(inputStream, contentLength, MediaType.APPLICATION_OCTET_STREAM);
+		public void putStream(InputStream inputStream, long contentLength) {
+			putStream(inputStream, contentLength, MediaType.APPLICATION_OCTET_STREAM);
 		}
 
 		/**
@@ -240,10 +225,9 @@ public class S3OperationBuilder {
 		 * @param inputStream The InputStream to upload
 		 * @param contentLength The length of the content in bytes
 		 * @param mediaType The media type of the content
-		 * @return true if the object was uploaded successfully
 		 * @since 0.3.0
 		 */
-		public boolean putStream(InputStream inputStream, long contentLength, MediaType mediaType) {
+		public void putStream(InputStream inputStream, long contentLength, MediaType mediaType) {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -259,7 +243,6 @@ public class S3OperationBuilder {
 					return contentLength;
 				}
 			}).retrieve().toBodilessEntity();
-			return true;
 		}
 
 		/**
@@ -358,9 +341,8 @@ public class S3OperationBuilder {
 
 		/**
 		 * Deletes the object.
-		 * @return true if the object was deleted successfully
 		 */
-		public boolean delete() {
+		public void delete() {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -369,7 +351,6 @@ public class S3OperationBuilder {
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.build();
 			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
-			return true;
 		}
 
 		/**

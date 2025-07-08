@@ -83,10 +83,9 @@ class StreamingIntegrationTest {
 
 		// Upload using streaming PUT
 		try (InputStream inputStream = new ByteArrayInputStream(contentBytes)) {
-			boolean success = s3Client.bucket(bucketName)
+			s3Client.bucket(bucketName)
 				.object(objectKey)
 				.putStream(inputStream, contentBytes.length, MediaType.TEXT_PLAIN);
-			assertThat(success).isTrue();
 		}
 
 		// Download using streaming GET
@@ -133,8 +132,7 @@ class StreamingIntegrationTest {
 
 		// Upload using streaming PUT
 		try (InputStream inputStream = new ByteArrayInputStream(largeData)) {
-			boolean success = s3Client.bucket(bucketName).object(objectKey).putStream(inputStream, largeData.length);
-			assertThat(success).isTrue();
+			s3Client.bucket(bucketName).object(objectKey).putStream(inputStream, largeData.length);
 		}
 
 		// Download using streaming GET and verify
