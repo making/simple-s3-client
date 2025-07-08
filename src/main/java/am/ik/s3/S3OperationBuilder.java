@@ -1,12 +1,11 @@
 package am.ik.s3;
 
+import java.net.URI;
+import java.util.Map;
+import java.util.function.Function;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
-
-import java.net.URI;
-import java.util.List;
-import java.util.function.Function;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
@@ -21,16 +20,29 @@ public class S3OperationBuilder {
 
 	private final RestClient restClient;
 
-	private final S3ClientConfiguration configuration;
+	private final URI endpoint;
+
+	private final String region;
+
+	private final String accessKeyId;
+
+	private final String secretAccessKey;
 
 	/**
 	 * Constructor for S3OperationBuilder.
 	 * @param restClient The RestClient instance to use for HTTP operations
-	 * @param configuration The S3 client configuration
+	 * @param endpoint The S3 endpoint URI
+	 * @param region The AWS region
+	 * @param accessKeyId The AWS access key ID
+	 * @param secretAccessKey The AWS secret access key
 	 */
-	public S3OperationBuilder(RestClient restClient, S3ClientConfiguration configuration) {
+	public S3OperationBuilder(RestClient restClient, URI endpoint, String region, String accessKeyId,
+			String secretAccessKey) {
 		this.restClient = restClient;
-		this.configuration = configuration;
+		this.endpoint = endpoint;
+		this.region = region;
+		this.accessKeyId = accessKeyId;
+		this.secretAccessKey = secretAccessKey;
 	}
 
 	/**
@@ -47,10 +59,10 @@ public class S3OperationBuilder {
 	 * @return ListBucketsResult containing all buckets
 	 */
 	public ListBucketsResult listBuckets() {
-		S3Request request = s3Request().endpoint(configuration.endpoint())
-			.region(configuration.region())
-			.accessKeyId(configuration.accessKeyId())
-			.secretAccessKey(configuration.secretAccessKey())
+		S3Request request = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
 			.method(HttpMethod.GET)
 			.path(Function.identity())
 			.build();
@@ -74,10 +86,10 @@ public class S3OperationBuilder {
 		 * @return true if the bucket was created successfully
 		 */
 		public boolean create() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.PUT)
 				.path(b -> b.bucket(bucketName))
 				.build();
@@ -92,10 +104,10 @@ public class S3OperationBuilder {
 		 * @return true if the bucket was deleted successfully
 		 */
 		public boolean delete() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.DELETE)
 				.path(b -> b.bucket(bucketName))
 				.build();
@@ -110,10 +122,10 @@ public class S3OperationBuilder {
 		 * @return ListBucketResult containing the objects in the bucket
 		 */
 		public ListBucketResult listObjects() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.GET)
 				.path(b -> b.bucket(bucketName))
 				.build();
@@ -166,17 +178,15 @@ public class S3OperationBuilder {
 		 * @return true if the object was uploaded successfully
 		 */
 		public boolean put(String content, MediaType mediaType) {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.PUT)
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.content(S3Content.of(content, mediaType))
 				.build();
-
 			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
-
 			return true;
 		}
 
@@ -196,17 +206,15 @@ public class S3OperationBuilder {
 		 * @return true if the object was uploaded successfully
 		 */
 		public boolean put(byte[] content, MediaType mediaType) {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.PUT)
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.content(S3Content.of(content, mediaType))
 				.build();
-
 			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
-
 			return true;
 		}
 
@@ -215,14 +223,13 @@ public class S3OperationBuilder {
 		 * @return The object content as a string
 		 */
 		public String get() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.GET)
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.build();
-
 			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(String.class);
 		}
 
@@ -231,14 +238,13 @@ public class S3OperationBuilder {
 		 * @return The object content as a byte array
 		 */
 		public byte[] getAsBytes() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.GET)
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.build();
-
 			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(byte[].class);
 		}
 
@@ -247,35 +253,92 @@ public class S3OperationBuilder {
 		 * @return true if the object was deleted successfully
 		 */
 		public boolean delete() {
-			S3Request request = s3Request().endpoint(configuration.endpoint())
-				.region(configuration.region())
-				.accessKeyId(configuration.accessKeyId())
-				.secretAccessKey(configuration.secretAccessKey())
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
 				.method(HttpMethod.DELETE)
 				.path(b -> b.bucket(bucketName).key(objectKey))
 				.build();
-
 			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
-
 			return true;
 		}
 
 		/**
-		 * Creates a presigned URL builder for this object.
-		 * @return a new PresignedUrl.Builder instance
+		 * Generates a presigned URL for this object with the specified HTTP method,
+		 * expiration, and additional headers.
+		 * @param method the HTTP method (GET, PUT, or DELETE)
+		 * @param expiration the duration until the URL expires
+		 * @param additionalHeaders additional headers to include in the presigned URL
+		 * @return a PresignedUrl containing the URL and expiration information
+		 * @throws IllegalArgumentException if the method is not GET, PUT, or DELETE
 		 * @since 0.3.0
 		 */
-		public PresignedUrl.Builder presignedUrl() {
-			return PresignedUrl.builder(configuration, bucketName, objectKey);
+		public PresignedUrl presignedUrl(HttpMethod method, java.time.Duration expiration,
+				Map<String, String> additionalHeaders) {
+			if (!(method == HttpMethod.GET || method == HttpMethod.PUT || method == HttpMethod.DELETE)) {
+				throw new IllegalArgumentException("Method not supported: " + method);
+			}
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(method)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+			return request.presignedUrl(expiration, additionalHeaders);
 		}
 
 		/**
-		 * Creates a presigned POST form builder for this object.
+		 * Generates a presigned URL for this object with the specified HTTP method and
+		 * expiration.
+		 * @param method the HTTP method (GET, PUT, or DELETE)
+		 * @param expiration the duration until the URL expires
+		 * @return a PresignedUrl containing the URL and expiration information
+		 * @throws IllegalArgumentException if the method is not GET, PUT, or DELETE
+		 * @since 0.3.0
+		 */
+		public PresignedUrl presignedUrl(HttpMethod method, java.time.Duration expiration) {
+			return presignedUrl(method, expiration, Map.of());
+		}
+
+		/**
+		 * Generates a presigned URL for this object with the specified HTTP method and a
+		 * default expiration of 1 hour.
+		 * @param method the HTTP method (GET, PUT, or DELETE)
+		 * @return a PresignedUrl containing the URL and expiration information
+		 * @throws IllegalArgumentException if the method is not GET, PUT, or DELETE
+		 * @since 0.3.0
+		 */
+		public PresignedUrl presignedUrl(HttpMethod method) {
+			return presignedUrl(method, java.time.Duration.ofHours(1));
+		}
+
+		/**
+		 * Creates a presigned POST form generator for this object with a default
+		 * expiration of 1 hour.
+		 * @return a new PresignedPostForm.Generator instance
+		 * @since 0.3.0
+		 */
+		public PresignedPostForm.Generator presignedPostForm() {
+			return presignedPostForm(java.time.Duration.ofHours(1));
+		}
+
+		/**
+		 * Creates a presigned POST form generator for this object.
+		 * @param expiration the duration until the URL expires
 		 * @return a new PresignedPostForm.Builder instance
 		 * @since 0.3.0
 		 */
-		public PresignedPostForm.Builder presignedPostForm() {
-			return PresignedPostForm.builder(configuration, bucketName, objectKey);
+		public PresignedPostForm.Generator presignedPostForm(java.time.Duration expiration) {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(org.springframework.http.HttpMethod.POST)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build();
+			return request.presignedPostForm(expiration);
 		}
 
 	}

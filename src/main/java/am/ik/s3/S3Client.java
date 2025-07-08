@@ -37,10 +37,13 @@ public final class S3Client {
 	/**
 	 * Private constructor. Use builder() to create instances.
 	 * @param restClient The RestClient instance to use
-	 * @param configuration The S3 client configuration
+	 * @param endpoint The S3 endpoint URI
+	 * @param region The AWS region
+	 * @param accessKeyId The AWS access key ID
+	 * @param secretAccessKey The AWS secret access key
 	 */
-	private S3Client(RestClient restClient, S3ClientConfiguration configuration) {
-		this.operationBuilder = new S3OperationBuilder(restClient, configuration);
+	private S3Client(RestClient restClient, URI endpoint, String region, String accessKeyId, String secretAccessKey) {
+		this.operationBuilder = new S3OperationBuilder(restClient, endpoint, region, accessKeyId, secretAccessKey);
 	}
 
 	/**
@@ -144,13 +147,30 @@ public final class S3Client {
 		 * @throws IllegalArgumentException if any required configuration is missing
 		 */
 		public S3Client build() {
-			S3ClientConfiguration configuration = new S3ClientConfiguration(endpoint, region, accessKeyId,
-					secretAccessKey);
-			configuration.validate();
+			validateConfiguration();
 
 			RestClient clientToUse = restClient != null ? restClient : createDefaultRestClient();
 
-			return new S3Client(clientToUse, configuration);
+			return new S3Client(clientToUse, endpoint, region, accessKeyId, secretAccessKey);
+		}
+
+		/**
+		 * Validates the configuration parameters.
+		 * @throws IllegalArgumentException if any required parameter is null or empty
+		 */
+		private void validateConfiguration() {
+			if (endpoint == null) {
+				throw new IllegalArgumentException("Endpoint must not be null");
+			}
+			if (region == null || region.isBlank()) {
+				throw new IllegalArgumentException("Region must not be null or empty");
+			}
+			if (accessKeyId == null || accessKeyId.isBlank()) {
+				throw new IllegalArgumentException("Access key ID must not be null or empty");
+			}
+			if (secretAccessKey == null || secretAccessKey.isBlank()) {
+				throw new IllegalArgumentException("Secret access key must not be null or empty");
+			}
 		}
 
 		/**

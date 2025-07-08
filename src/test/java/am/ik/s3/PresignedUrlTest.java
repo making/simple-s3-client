@@ -25,8 +25,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.RequestEntity;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,7 +59,7 @@ class PresignedUrlTest {
 			.build();
 
 		Duration expiration = Duration.ofHours(1);
-		PresignedUrl presignedUrl = request.generatePresignedUrl(expiration);
+		PresignedUrl presignedUrl = request.presignedUrl(expiration);
 
 		assertThat(presignedUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
 		assertThat(presignedUrl.url().toString()).contains("X-Amz-Credential=" + ACCESS_KEY_ID);
@@ -85,7 +83,7 @@ class PresignedUrlTest {
 
 		Duration expiration = Duration.ofMinutes(30);
 		Map<String, String> headers = Map.of("Content-Type", "application/json");
-		PresignedUrl presignedUrl = request.generatePresignedUrl(expiration, headers);
+		PresignedUrl presignedUrl = request.presignedUrl(expiration, headers);
 
 		assertThat(presignedUrl.url().toString()).contains("X-Amz-SignedHeaders=content-type;host");
 		assertThat(presignedUrl.url().toString()).contains("X-Amz-Expires=1800");
@@ -112,8 +110,6 @@ class PresignedUrlTest {
 
 	@Test
 	void testPresignedUrlBuilderWithS3Client() {
-		S3ClientConfiguration config = new S3ClientConfiguration(URI.create(ENDPOINT), REGION, ACCESS_KEY_ID,
-				SECRET_ACCESS_KEY);
 		S3Client client = S3Client.builder()
 			.endpoint(ENDPOINT)
 			.region(REGION)
@@ -122,19 +118,14 @@ class PresignedUrlTest {
 
 		PresignedUrl getUrl = client.bucket(BUCKET)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofHours(2))
-			.forGet();
+			.presignedUrl(HttpMethod.GET, Duration.ofHours(2));
 
 		assertThat(getUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
 		assertThat(getUrl.url().toString()).contains("X-Amz-Expires=7200");
 
 		PresignedUrl putUrl = client.bucket(BUCKET)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofMinutes(15))
-			.contentType(MediaType.APPLICATION_JSON)
-			.forPut();
+			.presignedUrl(HttpMethod.PUT, Duration.ofMinutes(15), Map.of("Content-Type", "application/json"));
 
 		assertThat(putUrl.url().toString()).contains("X-Amz-Expires=900");
 		assertThat(putUrl.requiredHeaders()).containsEntry("Content-Type", "application/json");

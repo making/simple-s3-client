@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
 import org.springframework.util.LinkedMultiValueMap;
@@ -111,9 +112,7 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned GET URL
 		PresignedUrl getUrl = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofMinutes(15))
-			.forGet();
+			.presignedUrl(HttpMethod.GET, Duration.ofMinutes(15));
 
 		assertThat(getUrl.url()).isNotNull();
 		assertThat(getUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
@@ -137,9 +136,7 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned PUT URL without Content-Type header
 		PresignedUrl putUrl = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofMinutes(15))
-			.forPut();
+			.presignedUrl(HttpMethod.PUT, Duration.ofMinutes(15));
 
 		assertThat(putUrl.url()).isNotNull();
 		assertThat(putUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
@@ -173,9 +170,7 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned DELETE URL
 		PresignedUrl deleteUrl = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofMinutes(15))
-			.forDelete();
+			.presignedUrl(HttpMethod.DELETE, Duration.ofMinutes(15));
 
 		assertThat(deleteUrl.url()).isNotNull();
 		assertThat(deleteUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
@@ -201,10 +196,9 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned POST form
 		PresignedPostForm postForm = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedPostForm()
-			.expiration(Duration.ofMinutes(15))
+			.presignedPostForm(Duration.ofMinutes(15))
 			.maxFileSize(1024 * 1024) // 1MB
-			.field("Content-Type", "text/plain")
+			.addField("Content-Type", "text/plain")
 			.generate();
 
 		assertThat(postForm.url()).isNotNull();
@@ -242,9 +236,7 @@ class PresignedUrlIntegrationTest {
 		Duration customExpiration = Duration.ofHours(2);
 		PresignedUrl getUrl = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(customExpiration)
-			.forGet();
+			.presignedUrl(HttpMethod.GET, customExpiration);
 
 		assertThat(getUrl.url().toString()).contains("X-Amz-Expires=7200"); // 2 hours =
 																			// 7200
@@ -268,10 +260,9 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned POST form with DataSize
 		PresignedPostForm postForm = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedPostForm()
-			.expiration(Duration.ofMinutes(15))
+			.presignedPostForm(Duration.ofMinutes(15))
 			.maxFileSize(DataSize.ofMegabytes(5)) // 5MB using DataSize
-			.field("Content-Type", "text/plain")
+			.addField("Content-Type", "text/plain")
 			.generate();
 
 		assertThat(postForm.url()).isNotNull();
@@ -303,9 +294,7 @@ class PresignedUrlIntegrationTest {
 		// Generate presigned GET URL with 1 second expiration
 		PresignedUrl getUrl = client.bucket(BUCKET_NAME)
 			.object(OBJECT_KEY)
-			.presignedUrl()
-			.expiration(Duration.ofSeconds(1))
-			.forGet();
+			.presignedUrl(HttpMethod.GET, Duration.ofSeconds(1));
 
 		assertThat(getUrl.url()).isNotNull();
 		assertThat(getUrl.isExpired()).isFalse();
@@ -352,7 +341,7 @@ class PresignedUrlIntegrationTest {
 			.path(b -> b.bucket(BUCKET_NAME).key(OBJECT_KEY))
 			.build();
 
-		PresignedUrl presignedUrl = request.generatePresignedUrl(Duration.ofMinutes(15));
+		PresignedUrl presignedUrl = request.presignedUrl(Duration.ofMinutes(15));
 
 		assertThat(presignedUrl.url()).isNotNull();
 		assertThat(presignedUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
@@ -374,14 +363,19 @@ class PresignedUrlIntegrationTest {
 	@Test
 	void testLowLevelApiPresignedPostForm() {
 		// Generate presigned POST form using Low Level API
-		S3ClientConfiguration config = new S3ClientConfiguration(
-				URI.create(String.format("http://%s:%d", minio.getHost(), minio.getMappedPort(9000))), "us-east-1",
-				ACCESS_KEY, SECRET_KEY);
+		String endpoint = String.format("http://%s:%d", minio.getHost(), minio.getMappedPort(9000));
 
-		PresignedPostForm postForm = PresignedPostForm.builder(config, BUCKET_NAME, OBJECT_KEY)
-			.expiration(Duration.ofMinutes(15))
+		S3Request request = s3Request().endpoint(URI.create(endpoint))
+			.region("us-east-1")
+			.accessKeyId(ACCESS_KEY)
+			.secretAccessKey(SECRET_KEY)
+			.method(POST)
+			.path(b -> b.bucket(BUCKET_NAME).key(OBJECT_KEY))
+			.build();
+
+		PresignedPostForm postForm = request.presignedPostForm(Duration.ofMinutes(15))
 			.maxFileSize(DataSize.ofMegabytes(1))
-			.field("Content-Type", "text/plain")
+			.addField("Content-Type", "text/plain")
 			.generate();
 
 		assertThat(postForm.url()).isNotNull();

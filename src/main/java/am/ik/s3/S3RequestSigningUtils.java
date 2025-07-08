@@ -33,6 +33,16 @@ final class S3RequestSigningUtils {
 	private S3RequestSigningUtils() {
 	}
 
+	public static String generateSignature(String secretAccessKey, String region, String stringToSign,
+			AmzDate amzDate) {
+		byte[] kSecret = ("AWS4" + secretAccessKey).getBytes(StandardCharsets.UTF_8);
+		byte[] kDate = S3RequestSigningUtils.hmacSHA256(amzDate.yymmdd(), kSecret);
+		byte[] kRegion = S3RequestSigningUtils.hmacSHA256(region, kDate);
+		byte[] kService = S3RequestSigningUtils.hmacSHA256("s3", kRegion);
+		byte[] kSigning = S3RequestSigningUtils.hmacSHA256("aws4_request", kService);
+		return S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.hmacSHA256(stringToSign, kSigning));
+	}
+
 	/**
 	 * Computes HMAC-SHA256 of the given data using the given key.
 	 * @param data the data to sign

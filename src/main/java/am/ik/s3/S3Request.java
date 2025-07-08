@@ -21,17 +21,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import org.jilt.Builder;
 import org.jilt.BuilderStyle;
 import org.jilt.Opt;
-
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.RequestEntity;
@@ -51,6 +50,8 @@ public final class S3Request {
 	private final String secretAccessKey;
 
 	private final HttpMethod method;
+
+	private final S3Path s3Path;
 
 	private final String canonicalUri;
 
@@ -92,7 +93,13 @@ public final class S3Request {
 		this.accessKeyId = accessKeyId;
 		this.secretAccessKey = secretAccessKey;
 		this.method = method;
-		this.canonicalUri = path == null ? "/" : path.apply(new S3PathBuilder()).build().toCanonicalUri();
+		if (path == null) {
+			this.s3Path = S3PathBuilder.s3Path().bucket("").key("/").build();
+		}
+		else {
+			this.s3Path = path.apply(S3PathBuilder.s3Path()).build();
+		}
+		this.canonicalUri = s3Path.toCanonicalUri();
 		this.canonicalQueryString = Objects.requireNonNullElse(canonicalQueryString, "");
 		this.content = content;
 		this.clock = Objects.requireNonNullElseGet(clock, Clock::systemUTC);
@@ -170,26 +177,18 @@ public final class S3Request {
 			.encodeHex(S3RequestSigningUtils.sha256Hash(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
 		// Step 3: Create a string to sign
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-string-to-sign
-		String credentialScope = "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
+		String credentialScope = getCredentialScope(amzDate);
 		String stringToSign = String.join("\n", AWS4_HMAC_SHA256, amzDate.date(), credentialScope,
 				hashedCanonicalRequest);
 		// Step 4: Calculate the signature
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#calculate-signature
-		String signature = this.sign(stringToSign, amzDate);
+		String signature = S3RequestSigningUtils.generateSignature(this.secretAccessKey, this.region, stringToSign,
+				amzDate);
 		// Step 5: Add the signature to the request
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#add-signature-to-request
-		String credential = "%s/%s".formatted(this.accessKeyId, credentialScope);
+		String credential = getCredential(credentialScope);
 		return "%s Credential=%s,SignedHeaders=%s,Signature=%s".formatted(AWS4_HMAC_SHA256, credential, signedHeaders,
 				signature);
-	}
-
-	private String sign(String stringToSign, AmzDate amzDate) {
-		byte[] kSecret = ("AWS4" + this.secretAccessKey).getBytes(StandardCharsets.UTF_8);
-		byte[] kDate = S3RequestSigningUtils.hmacSHA256(amzDate.yymmdd(), kSecret);
-		byte[] kRegion = S3RequestSigningUtils.hmacSHA256(this.region, kDate);
-		byte[] kService = S3RequestSigningUtils.hmacSHA256("s3", kRegion);
-		byte[] kSigning = S3RequestSigningUtils.hmacSHA256("aws4_request", kService);
-		return S3RequestSigningUtils.encodeHex(S3RequestSigningUtils.hmacSHA256(stringToSign, kSigning));
 	}
 
 	/**
@@ -198,8 +197,8 @@ public final class S3Request {
 	 * @return a PresignedUrl containing the URL and expiration information
 	 * @since 0.3.0
 	 */
-	public PresignedUrl generatePresignedUrl(Duration expiration) {
-		return generatePresignedUrl(expiration, null);
+	public PresignedUrl presignedUrl(Duration expiration) {
+		return presignedUrl(expiration, null);
 	}
 
 	/**
@@ -209,11 +208,11 @@ public final class S3Request {
 	 * @return a PresignedUrl containing the URL and expiration information
 	 * @since 0.3.0
 	 */
-	public PresignedUrl generatePresignedUrl(Duration expiration, Map<String, String> additionalHeaders) {
+	public PresignedUrl presignedUrl(Duration expiration, Map<String, String> additionalHeaders) {
 		Instant expirationTime = clock.instant().plus(expiration);
 		AmzDate amzDate = new AmzDate(clock.instant());
-		String credentialScope = "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
-		String credential = "%s/%s".formatted(this.accessKeyId, credentialScope);
+		String credentialScope = getCredentialScope(amzDate);
+		String credential = getCredential(credentialScope);
 
 		TreeMap<String, String> queryParams = new TreeMap<>();
 		queryParams.put("X-Amz-Algorithm", AWS4_HMAC_SHA256);
@@ -222,8 +221,8 @@ public final class S3Request {
 		queryParams.put("X-Amz-Expires", String.valueOf(expiration.getSeconds()));
 		queryParams.put("X-Amz-SignedHeaders", "host");
 
-		if (!canonicalQueryString.isEmpty()) {
-			String[] pairs = canonicalQueryString.split("&");
+		if (!this.canonicalQueryString.isEmpty()) {
+			String[] pairs = this.canonicalQueryString.split("&");
 			for (String pair : pairs) {
 				String[] parts = pair.split("=", 2);
 				if (parts.length == 2) {
@@ -263,7 +262,8 @@ public final class S3Request {
 			.encodeHex(S3RequestSigningUtils.sha256Hash(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
 		String stringToSign = String.join("\n", AWS4_HMAC_SHA256, amzDate.date(), credentialScope,
 				hashedCanonicalRequest);
-		String signature = this.sign(stringToSign, amzDate);
+		String signature = S3RequestSigningUtils.generateSignature(this.secretAccessKey, this.region, stringToSign,
+				amzDate);
 
 		queryParams.put("X-Amz-Signature", signature);
 
@@ -274,6 +274,42 @@ public final class S3Request {
 		URI presignedUri = builder.build().toUri();
 
 		return new PresignedUrl(presignedUri, expirationTime, additionalHeaders != null ? additionalHeaders : Map.of());
+	}
+
+	/**
+	 * Generates a presigned POST form for this S3 request using the S3 path information.
+	 * @param expiration the duration until the form expires
+	 * @return a PresignedPostForm.Generator for further configuration
+	 * @since 0.3.0
+	 */
+	public PresignedPostForm.Generator presignedPostForm(Duration expiration) {
+		Instant expirationTime = this.clock.instant().plus(expiration);
+		AmzDate amzDate = new AmzDate(this.clock.instant());
+
+		String bucketName = this.s3Path.bucket();
+		String objectKey = this.s3Path.key();
+		URI url = UriComponentsBuilder.fromUri(endpoint).path("/" + bucketName).build().toUri();
+
+		String credentialScope = getCredentialScope(amzDate);
+		String credential = getCredential(credentialScope);
+
+		Map<String, String> fields = new LinkedHashMap<>();
+		fields.put("key", objectKey);
+		fields.put("bucket", bucketName);
+		fields.put("X-Amz-Algorithm", AWS4_HMAC_SHA256);
+		fields.put("X-Amz-Credential", credential);
+		fields.put("X-Amz-Date", amzDate.date());
+
+		return new PresignedPostForm.Generator(url, expirationTime, stringToSign -> S3RequestSigningUtils
+			.generateSignature(this.secretAccessKey, this.region, stringToSign, amzDate)).addFields(fields);
+	}
+
+	private String getCredentialScope(AmzDate amzDate) {
+		return "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
+	}
+
+	private String getCredential(String credentialScope) {
+		return "%s/%s".formatted(this.accessKeyId, credentialScope);
 	}
 
 	private static String urlEncode(String value) {
