@@ -97,9 +97,37 @@ System.out.println("Form fields: " + postForm.formFields());
 //   <button type="submit">Upload</button>
 // </form>
 
+// Multipart upload for large files
+byte[] largeFileData = createLargeFile(); // 50MB file
+CompleteMultipartUploadResult uploadResult = client.bucket("my-bucket")
+    .object("large-file.zip")
+    .multipartUpload()
+    .partSize(DataSize.ofMegabytes(10))
+    .maxConcurrentUploads(3)
+    .progressCallback(ProgressCallback.logging())
+    .upload(largeFileData);
+System.out.println("Large file uploaded: " + uploadResult.etag());
+
+// Multipart upload with InputStream
+try (FileInputStream fileInputStream = new FileInputStream("large-file.dat")) {
+    long fileSize = Files.size(Paths.get("large-file.dat"));
+    CompletableFuture<CompleteMultipartUploadResult> future = client.bucket("my-bucket")
+        .object("async-large-file.dat")
+        .multipartUpload()
+        .partSize(DataSize.ofMegabytes(5))
+        .maxConcurrentUploads(5)
+        .uploadAsync(fileInputStream, fileSize);
+    
+    // Continue with other work...
+    CompleteMultipartUploadResult result = future.get(); // Wait for completion
+    System.out.println("Async upload completed: " + result.etag());
+}
+
 // Clean up
 client.bucket("my-bucket").object("hello.txt").delete();
 client.bucket("my-bucket").object("test.png").delete();
+client.bucket("my-bucket").object("large-file.zip").delete();
+client.bucket("my-bucket").object("async-large-file.dat").delete();
 client.bucket("my-bucket").delete();
 ```
 
@@ -267,6 +295,63 @@ S3Request verifyRequest = s3Request().endpoint(endpoint)
 	.build();
 String uploadedContent = restTemplate.exchange(verifyRequest.toEntityBuilder().build(), String.class).getBody();
 System.out.println("Uploaded content: " + uploadedContent);
+
+// Multipart upload example with RestTemplate
+byte[] largeData = new byte[15 * 1024 * 1024]; // 15MB file
+Arrays.fill(largeData, (byte) 'A');
+
+S3Request baseRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.PUT)
+	.path(b -> b.bucket(bucket).key("large-file.dat"))
+	.build();
+
+// Step 1: Initiate multipart upload
+S3Request initiateRequest = baseRequest.initiateMultipartUpload();
+InitiateMultipartUploadResult initResult = restTemplate.exchange(
+	initiateRequest.toEntityBuilder().build(), 
+	InitiateMultipartUploadResult.class).getBody();
+String uploadId = initResult.uploadId();
+
+try {
+	// Step 2: Upload parts
+	List<CompletedPart> completedParts = new ArrayList<>();
+	int partSize = 5 * 1024 * 1024; // 5MB per part
+	int partNumber = 1;
+	
+	for (int offset = 0; offset < largeData.length; offset += partSize) {
+		int currentPartSize = Math.min(partSize, largeData.length - offset);
+		byte[] partData = Arrays.copyOfRange(largeData, offset, offset + currentPartSize);
+		
+		S3Request uploadPartRequest = baseRequest.uploadPart(uploadId, partNumber, partData);
+		ResponseEntity<Void> partResponse = restTemplate.exchange(
+			uploadPartRequest.toEntityBuilder().body(partData), Void.class);
+		
+		String etag = partResponse.getHeaders().getFirst("ETag");
+		if (etag.startsWith("\"") && etag.endsWith("\"")) {
+			etag = etag.substring(1, etag.length() - 1);
+		}
+		completedParts.add(new CompletedPart(etag, partNumber));
+		partNumber++;
+	}
+	
+	// Step 3: Complete multipart upload
+	CompleteMultipartUpload completeRequest = new CompleteMultipartUpload(completedParts);
+	S3Request completeUploadRequest = baseRequest.completeMultipartUpload(uploadId, completeRequest);
+	CompleteMultipartUploadResult result = restTemplate.exchange(
+		completeUploadRequest.toEntityBuilder().body(completeRequest), 
+		CompleteMultipartUploadResult.class).getBody();
+	
+	System.out.println("Multipart upload completed: " + result.etag());
+	
+} catch (Exception e) {
+	// Abort multipart upload on error
+	S3Request abortRequest = baseRequest.abortMultipartUpload(uploadId);
+	restTemplate.exchange(abortRequest.toEntityBuilder().build(), Void.class);
+	throw new RuntimeException("Multipart upload failed", e);
+}
 ```
 
 ## Examples with `RestClient` (Low-level API)
@@ -460,6 +545,76 @@ String uploadedContent = restClient.get()
 	.retrieve()
 	.body(String.class);
 System.out.println("Uploaded content: " + uploadedContent);
+
+// Multipart upload example with RestClient
+byte[] largeData = new byte[15 * 1024 * 1024]; // 15MB file
+Arrays.fill(largeData, (byte) 'A');
+
+S3Request baseRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.PUT)
+	.path(b -> b.bucket(bucket).key("large-file.dat"))
+	.build();
+
+// Step 1: Initiate multipart upload
+S3Request initiateRequest = baseRequest.initiateMultipartUpload();
+InitiateMultipartUploadResult initResult = restClient.post()
+	.uri(initiateRequest.uri())
+	.headers(initiateRequest.headers())
+	.retrieve()
+	.body(InitiateMultipartUploadResult.class);
+String uploadId = initResult.uploadId();
+
+try {
+	// Step 2: Upload parts
+	List<CompletedPart> completedParts = new ArrayList<>();
+	int partSize = 5 * 1024 * 1024; // 5MB per part
+	int partNumber = 1;
+	
+	for (int offset = 0; offset < largeData.length; offset += partSize) {
+		int currentPartSize = Math.min(partSize, largeData.length - offset);
+		byte[] partData = Arrays.copyOfRange(largeData, offset, offset + currentPartSize);
+		
+		S3Request uploadPartRequest = baseRequest.uploadPart(uploadId, partNumber, partData);
+		var partResponse = restClient.put()
+			.uri(uploadPartRequest.uri())
+			.headers(uploadPartRequest.headers())
+			.body(partData)
+			.retrieve()
+			.toBodilessEntity();
+		
+		String etag = partResponse.getHeaders().getFirst("ETag");
+		if (etag.startsWith("\"") && etag.endsWith("\"")) {
+			etag = etag.substring(1, etag.length() - 1);
+		}
+		completedParts.add(new CompletedPart(etag, partNumber));
+		partNumber++;
+	}
+	
+	// Step 3: Complete multipart upload
+	CompleteMultipartUpload completeRequest = new CompleteMultipartUpload(completedParts);
+	S3Request completeUploadRequest = baseRequest.completeMultipartUpload(uploadId, completeRequest);
+	CompleteMultipartUploadResult result = restClient.post()
+		.uri(completeUploadRequest.uri())
+		.headers(completeUploadRequest.headers())
+		.body(completeRequest)
+		.retrieve()
+		.body(CompleteMultipartUploadResult.class);
+	
+	System.out.println("Multipart upload completed: " + result.etag());
+	
+} catch (Exception e) {
+	// Abort multipart upload on error
+	S3Request abortRequest = baseRequest.abortMultipartUpload(uploadId);
+	restClient.delete()
+		.uri(abortRequest.uri())
+		.headers(abortRequest.headers())
+		.retrieve()
+		.toBodilessEntity();
+	throw new RuntimeException("Multipart upload failed", e);
+}
 ```
 
 ## API Overview
@@ -506,6 +661,17 @@ System.out.println("Uploaded content: " + uploadedContent);
 - `.addCondition(String)` - Add a policy condition
 - `.addConditions(List<String>)` - Add multiple policy conditions
 - `.generate()` - Generate the presigned POST form
+
+#### Multipart Upload Operations
+- `.multipartUpload()` - Create a multipart upload builder for large files
+- `.partSize(DataSize)` - Set the part size (minimum 5MB, maximum 5GB)
+- `.maxConcurrentUploads(int)` - Set maximum number of concurrent part uploads
+- `.progressCallback(ProgressCallback)` - Set progress tracking callback
+- `.configuration(MultipartUploadConfiguration)` - Set custom configuration
+- `.upload(byte[])` - Upload data using multipart upload (synchronous)
+- `.upload(InputStream, long)` - Upload from input stream (synchronous)
+- `.uploadAsync(byte[])` - Upload data asynchronously
+- `.uploadAsync(InputStream, long)` - Upload from input stream asynchronously
 
 ### When to Use Which API
 

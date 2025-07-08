@@ -304,6 +304,114 @@ public final class S3Request {
 			.generateSignature(this.secretAccessKey, this.region, stringToSign, amzDate)).addFields(fields);
 	}
 
+	/**
+	 * Creates a new S3Request for initiating multipart upload.
+	 * @return a new S3Request configured for InitiateMultipartUpload operation
+	 * @since 0.3.0
+	 */
+	public S3Request initiateMultipartUpload() {
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.POST)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString("uploads=")
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for uploading a part in a multipart upload.
+	 * @param uploadId the upload ID from initiate multipart upload
+	 * @param partNumber the part number (must be between 1 and 10,000)
+	 * @param partData the data for this part
+	 * @return a new S3Request configured for UploadPart operation
+	 * @since 0.3.0
+	 */
+	public S3Request uploadPart(String uploadId, int partNumber, byte[] partData) {
+		String queryString = "partNumber=" + partNumber + "&uploadId=" + urlEncode(uploadId);
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.PUT)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(queryString)
+			.content(S3Content.of(partData, org.springframework.http.MediaType.APPLICATION_OCTET_STREAM))
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for completing a multipart upload.
+	 * @param uploadId the upload ID from initiate multipart upload
+	 * @param completeRequest the complete multipart upload request body
+	 * @return a new S3Request configured for CompleteMultipartUpload operation
+	 * @since 0.3.0
+	 */
+	public S3Request completeMultipartUpload(String uploadId, CompleteMultipartUpload completeRequest) {
+		String queryString = "uploadId=" + urlEncode(uploadId);
+		try {
+			com.fasterxml.jackson.dataformat.xml.XmlMapper xmlMapper = new com.fasterxml.jackson.dataformat.xml.XmlMapper();
+			String xmlBody = xmlMapper.writeValueAsString(completeRequest);
+			// Use text/xml content type which is more compatible with S3/MinIO
+			org.springframework.http.MediaType xmlMediaType = org.springframework.http.MediaType
+				.parseMediaType("text/xml; charset=utf-8");
+			return S3RequestBuilder.s3Request()
+				.endpoint(this.endpoint)
+				.region(this.region)
+				.accessKeyId(this.accessKeyId)
+				.secretAccessKey(this.secretAccessKey)
+				.method(HttpMethod.POST)
+				.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+				.canonicalQueryString(queryString)
+				.content(S3Content.of(xmlBody, xmlMediaType))
+				.build();
+		}
+		catch (Exception e) {
+			throw new RuntimeException("Failed to serialize CompleteMultipartUpload request", e);
+		}
+	}
+
+	/**
+	 * Creates a new S3Request for aborting a multipart upload.
+	 * @param uploadId the upload ID from initiate multipart upload
+	 * @return a new S3Request configured for AbortMultipartUpload operation
+	 * @since 0.3.0
+	 */
+	public S3Request abortMultipartUpload(String uploadId) {
+		String queryString = "uploadId=" + urlEncode(uploadId);
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.DELETE)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(queryString)
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for listing parts of a multipart upload.
+	 * @param uploadId the upload ID from initiate multipart upload
+	 * @return a new S3Request configured for ListParts operation
+	 * @since 0.3.0
+	 */
+	public S3Request listParts(String uploadId) {
+		String queryString = "uploadId=" + urlEncode(uploadId);
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(queryString)
+			.build();
+	}
+
 	private String getCredentialScope(AmzDate amzDate) {
 		return "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
 	}
