@@ -242,7 +242,7 @@ public class S3OperationBuilder {
 		 * Gets (downloads) an object as a string.
 		 * @return The object content as a string
 		 */
-		public String get() {
+		public String getAsString() {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
@@ -612,7 +612,7 @@ public class S3OperationBuilder {
 		 * Gets the partial content as a string.
 		 * @return The partial object content as a string
 		 */
-		public String get() {
+		public String getAsString() {
 			S3Request request = s3Request().endpoint(endpoint)
 				.region(region)
 				.accessKeyId(accessKeyId)
