@@ -15,17 +15,12 @@
  */
 package am.ik.s3;
 
-import java.io.IOException;
+import am.ik.spring.logbook.AccessLoggerSink;
+import am.ik.spring.logbook.OpinionatedFilters;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
-
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
-
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
@@ -36,12 +31,14 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
+import org.zalando.logbook.Logbook;
+import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
 public class ReadMeRestClient {
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.getInterceptors()
 			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
@@ -153,11 +150,11 @@ public class ReadMeRestClient {
 			.method(HttpMethod.GET)
 			.path(b -> b.bucket(bucket).key("stream-test.txt"))
 			.build();
-		
+
 		PresignedUrl streamPresignedUrl = getStreamRequest.presignedUrl(Duration.ofMinutes(5));
 		String streamResponse = restClient.get()
 			.uri(streamPresignedUrl.url())
-			//.headers(streamPresignedUrl.headers())
+			.headers(streamPresignedUrl.headers())
 			.retrieve()
 			.body(String.class);
 		System.out.println("Stream Response: " + streamResponse);
