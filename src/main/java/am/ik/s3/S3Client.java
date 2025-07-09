@@ -25,7 +25,7 @@ import java.util.List;
  * client.bucket("my-bucket").object("file.txt").put("content");
  *
  * // Download object
- * String content = client.bucket("my-bucket").object("file.txt").get();
+ * String content = client.bucket("my-bucket").object("file.txt").getAsString();
  * }</pre>
  *
  * @since 0.3.0

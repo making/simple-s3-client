@@ -154,7 +154,7 @@ class PresignedUrlIntegrationTest {
 			.toBodilessEntity();
 
 		// Verify the object was uploaded correctly
-		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).get();
+		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).getAsString();
 		assertThat(downloadedContent).isEqualTo(TEST_CONTENT);
 	}
 
@@ -164,7 +164,7 @@ class PresignedUrlIntegrationTest {
 		client.bucket(BUCKET_NAME).object(OBJECT_KEY).put(TEST_CONTENT, MediaType.TEXT_PLAIN);
 
 		// Verify object exists
-		String content = client.bucket(BUCKET_NAME).object(OBJECT_KEY).get();
+		String content = client.bucket(BUCKET_NAME).object(OBJECT_KEY).getAsString();
 		assertThat(content).isEqualTo(TEST_CONTENT);
 
 		// Generate presigned DELETE URL
@@ -223,7 +223,7 @@ class PresignedUrlIntegrationTest {
 			.toBodilessEntity();
 
 		// Verify the object was uploaded correctly
-		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).get();
+		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).getAsString();
 		assertThat(downloadedContent).isEqualTo(TEST_CONTENT);
 	}
 
@@ -282,7 +282,7 @@ class PresignedUrlIntegrationTest {
 			.toBodilessEntity();
 
 		// Verify the object was uploaded correctly
-		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).get();
+		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).getAsString();
 		assertThat(downloadedContent).isEqualTo(TEST_CONTENT);
 	}
 
@@ -400,7 +400,7 @@ class PresignedUrlIntegrationTest {
 			.toBodilessEntity();
 
 		// Verify the object was uploaded correctly
-		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).get();
+		String downloadedContent = client.bucket(BUCKET_NAME).object(OBJECT_KEY).getAsString();
 		assertThat(downloadedContent).isEqualTo(TEST_CONTENT);
 	}
 

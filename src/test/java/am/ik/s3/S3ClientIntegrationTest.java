@@ -93,7 +93,7 @@ class S3ClientIntegrationTest {
 		client.bucket(bucketName).object(objectKey).put(content);
 
 		// Get object
-		String retrievedContent = client.bucket(bucketName).object(objectKey).get();
+		String retrievedContent = client.bucket(bucketName).object(objectKey).getAsString();
 		assertThat(retrievedContent).isEqualTo(content);
 
 		// Clean up
@@ -185,7 +185,7 @@ class S3ClientIntegrationTest {
 		client.bucket(bucketName).create();
 		client.bucket(bucketName).object(objectKey).put(content);
 
-		String retrievedContent = client.bucket(bucketName).object(objectKey).get();
+		String retrievedContent = client.bucket(bucketName).object(objectKey).getAsString();
 		assertThat(retrievedContent).isEqualTo(content);
 
 		// Clean up with fluent chaining

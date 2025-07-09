@@ -52,7 +52,7 @@ System.out.println(objects);
 client.bucket("my-bucket").object("hello.txt").put("Hello World!");
 client.bucket("my-bucket").object("test.png").put(imageBytes, MediaType.IMAGE_PNG);
 
-String content = client.bucket("my-bucket").object("hello.txt").get();
+String content = client.bucket("my-bucket").object("hello.txt").getAsString();
 System.out.println("Content: " + content); // Content: Hello World!
 
 byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
@@ -748,7 +748,7 @@ try {
 - `.put(byte[] content, MediaType mediaType)` - Upload binary with specific media type
 - `.putResource(Resource)` - Upload from Spring Resource
 - `.putResource(Resource, MediaType)` - Upload from Spring Resource with specific media type
-- `.get()` - Download as string
+- `.getAsString()` - Download as string
 - `.getAsBytes()` - Download as byte array
 - `.getAsResource()` - Download as Spring Resource for streaming
 - `.delete()` - Delete the object
@@ -786,7 +786,7 @@ try {
 - Range request builder methods:
   - `.getAsResource()` - Download partial content as Spring Resource
   - `.getAsBytes()` - Download partial content as byte array
-  - `.get()` - Download partial content as string
+  - `.getAsString()` - Download partial content as string
 
 
 ### When to Use Which API
