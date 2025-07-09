@@ -121,11 +121,7 @@ public final class S3Request {
 			contentSha256 = UNSIGNED_PAYLOAD;
 		}
 		TreeMap<String, String> headers = new TreeMap<>();
-		StringBuilder host = new StringBuilder(this.endpoint.getHost());
-		if (this.endpoint.getPort() != -1) {
-			host.append(":").append(this.endpoint.getPort());
-		}
-		headers.put(HttpHeaders.HOST, host.toString());
+		headers.put(HttpHeaders.HOST, buildHostHeader());
 		headers.put(AmzHttpHeaders.X_AMZ_CONTENT_SHA256, contentSha256);
 		headers.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
 
@@ -181,11 +177,8 @@ public final class S3Request {
 			AmzDate amzDate) {
 		// Step 1: Create a canonical request
 		// https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-canonical-request
-		String canonicalHeaders = headers.entrySet()
-			.stream()
-			.map(e -> "%s:%s".formatted(e.getKey().toLowerCase(), e.getValue()))
-			.collect(Collectors.joining("\n")) + "\n";
-		String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+		String canonicalHeaders = buildCanonicalHeaders(headers);
+		String signedHeaders = buildSignedHeaders(headers);
 		String canonicalRequest = String.join("\n", method.name(), canonicalUri, canonicalQueryString, canonicalHeaders,
 				signedHeaders, payloadHash);
 		// Step 2: Create a hash of the canonical request
@@ -249,15 +242,11 @@ public final class S3Request {
 		}
 
 		TreeMap<String, String> headers = new TreeMap<>();
-		StringBuilder host = new StringBuilder(this.endpoint.getHost());
-		if (this.endpoint.getPort() != -1) {
-			host.append(":").append(this.endpoint.getPort());
-		}
-		headers.put(HttpHeaders.HOST, host.toString());
+		headers.put(HttpHeaders.HOST, buildHostHeader());
 
 		if (additionalHeaders != null) {
 			headers.putAll(additionalHeaders);
-			String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+			String signedHeaders = buildSignedHeaders(headers);
 			queryParams.put(AmzHttpHeaders.X_AMZ_SIGNED_HEADERS, signedHeaders);
 		}
 
@@ -266,11 +255,8 @@ public final class S3Request {
 			.map(e -> urlEncode(e.getKey()) + "=" + urlEncode(e.getValue()))
 			.collect(Collectors.joining("&"));
 
-		String canonicalHeaders = headers.entrySet()
-			.stream()
-			.map(e -> "%s:%s".formatted(e.getKey().toLowerCase(), e.getValue()))
-			.collect(Collectors.joining("\n")) + "\n";
-		String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+		String canonicalHeaders = buildCanonicalHeaders(headers);
+		String signedHeaders = buildSignedHeaders(headers);
 
 		String canonicalRequest = String.join("\n", method.name(), canonicalUri, canonicalQueryStringForSigning,
 				canonicalHeaders, signedHeaders, UNSIGNED_PAYLOAD);
@@ -327,12 +313,7 @@ public final class S3Request {
 	 * @since 0.3.0
 	 */
 	public S3Request initiateMultipartUpload() {
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.POST)
+		return prepareRequestBuilder().method(HttpMethod.POST)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString("uploads=")
 			.build();
@@ -348,12 +329,7 @@ public final class S3Request {
 	 */
 	public S3Request uploadPart(String uploadId, int partNumber, byte[] partData) {
 		String queryString = "partNumber=" + partNumber + "&uploadId=" + urlEncode(uploadId);
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.PUT)
+		return prepareRequestBuilder().method(HttpMethod.PUT)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(queryString)
 			.content(S3Content.of(partData, org.springframework.http.MediaType.APPLICATION_OCTET_STREAM))
@@ -375,12 +351,7 @@ public final class S3Request {
 			// Use text/xml content type which is more compatible with S3/MinIO
 			org.springframework.http.MediaType xmlMediaType = org.springframework.http.MediaType
 				.parseMediaType("text/xml; charset=utf-8");
-			return S3RequestBuilder.s3Request()
-				.endpoint(this.endpoint)
-				.region(this.region)
-				.accessKeyId(this.accessKeyId)
-				.secretAccessKey(this.secretAccessKey)
-				.method(HttpMethod.POST)
+			return prepareRequestBuilder().method(HttpMethod.POST)
 				.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 				.canonicalQueryString(queryString)
 				.content(S3Content.of(xmlBody, xmlMediaType))
@@ -399,12 +370,7 @@ public final class S3Request {
 	 */
 	public S3Request abortMultipartUpload(String uploadId) {
 		String queryString = "uploadId=" + urlEncode(uploadId);
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.DELETE)
+		return prepareRequestBuilder().method(HttpMethod.DELETE)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(queryString)
 			.build();
@@ -418,12 +384,7 @@ public final class S3Request {
 	 */
 	public S3Request listParts(String uploadId) {
 		String queryString = "uploadId=" + urlEncode(uploadId);
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
+		return prepareRequestBuilder().method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(queryString)
 			.build();
@@ -445,12 +406,7 @@ public final class S3Request {
 		Map<String, String> rangeHeaders = new TreeMap<>(this.additionalHeaders);
 		rangeHeaders.put("Range", rangeHeader);
 
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
+		return prepareRequestBuilder().method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(this.canonicalQueryString)
 			.content(this.content)
@@ -474,12 +430,7 @@ public final class S3Request {
 		Map<String, String> rangeHeaders = new TreeMap<>(this.additionalHeaders);
 		rangeHeaders.put("Range", rangeHeader);
 
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
+		return prepareRequestBuilder().method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(this.canonicalQueryString)
 			.content(this.content)
@@ -493,12 +444,7 @@ public final class S3Request {
 	 * @since 0.3.0
 	 */
 	public S3Request listVersions() {
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
+		return prepareRequestBuilder().method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()))
 			.canonicalQueryString("versions=")
 			.build();
@@ -529,17 +475,9 @@ public final class S3Request {
 			params.put("max-keys", String.valueOf(maxKeys));
 		}
 
-		String queryString = params.entrySet()
-			.stream()
-			.map(e -> e.getValue().isEmpty() ? e.getKey() + "=" : e.getKey() + "=" + e.getValue())
-			.collect(Collectors.joining("&"));
+		String queryString = buildCanonicalQueryString(params);
 
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.GET)
+		return prepareRequestBuilder().method(HttpMethod.GET)
 			.path(b -> b.bucket(this.s3Path.bucket()))
 			.canonicalQueryString(queryString)
 			.build();
@@ -559,12 +497,7 @@ public final class S3Request {
 		String queryString = this.canonicalQueryString.isEmpty() ? "versionId=" + urlEncode(versionId)
 				: this.canonicalQueryString + "&versionId=" + urlEncode(versionId);
 
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(this.method)
+		return prepareRequestBuilder().method(this.method)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString(queryString)
 			.content(this.content)
@@ -583,12 +516,7 @@ public final class S3Request {
 			throw new IllegalArgumentException("Version ID cannot be null or empty");
 		}
 
-		return S3RequestBuilder.s3Request()
-			.endpoint(this.endpoint)
-			.region(this.region)
-			.accessKeyId(this.accessKeyId)
-			.secretAccessKey(this.secretAccessKey)
-			.method(HttpMethod.DELETE)
+		return prepareRequestBuilder().method(HttpMethod.DELETE)
 			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
 			.canonicalQueryString("versionId=" + urlEncode(versionId))
 			.build();
@@ -596,6 +524,63 @@ public final class S3Request {
 
 	private String getCredentialScope(AmzDate amzDate) {
 		return "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
+	}
+
+	/**
+	 * Prepares a new S3RequestBuilder with the common base configuration.
+	 * @return a configured S3RequestBuilder with endpoint, region, and credentials
+	 */
+	private S3RequestBuilders.Method prepareRequestBuilder() {
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey);
+	}
+
+	/**
+	 * Builds the host header value including port if necessary.
+	 * @return the host header value
+	 */
+	private String buildHostHeader() {
+		StringBuilder host = new StringBuilder(this.endpoint.getHost());
+		if (this.endpoint.getPort() != -1) {
+			host.append(":").append(this.endpoint.getPort());
+		}
+		return host.toString();
+	}
+
+	/**
+	 * Builds canonical headers string from headers map.
+	 * @param headers the headers map
+	 * @return the canonical headers string
+	 */
+	private String buildCanonicalHeaders(TreeMap<String, String> headers) {
+		return headers.entrySet()
+			.stream()
+			.map(e -> "%s:%s".formatted(e.getKey().toLowerCase(), e.getValue()))
+			.collect(Collectors.joining("\n")) + "\n";
+	}
+
+	/**
+	 * Builds signed headers string from headers map.
+	 * @param headers the headers map
+	 * @return the signed headers string
+	 */
+	private String buildSignedHeaders(TreeMap<String, String> headers) {
+		return headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
+	}
+
+	/**
+	 * Builds canonical query string from parameters map.
+	 * @param params the parameters map
+	 * @return the canonical query string
+	 */
+	private String buildCanonicalQueryString(Map<String, String> params) {
+		return params.entrySet()
+			.stream()
+			.map(e -> e.getValue().isEmpty() ? e.getKey() + "=" : e.getKey() + "=" + e.getValue())
+			.collect(Collectors.joining("&"));
 	}
 
 	private String getCredential(String credentialScope) {
