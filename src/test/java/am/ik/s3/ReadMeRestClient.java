@@ -15,6 +15,7 @@
  */
 package am.ik.s3;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -40,7 +41,7 @@ import static am.ik.s3.S3RequestBuilder.s3Request;
 
 public class ReadMeRestClient {
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.getInterceptors()
 			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
@@ -144,7 +145,7 @@ public class ReadMeRestClient {
 			.retrieve()
 			.toBodilessEntity();
 
-		// Verify the uploaded streaming content
+		// Verify the uploaded streaming content using presigned URL
 		S3Request getStreamRequest = s3Request().endpoint(endpoint)
 			.region(region)
 			.accessKeyId(accessKeyId)
@@ -152,9 +153,11 @@ public class ReadMeRestClient {
 			.method(HttpMethod.GET)
 			.path(b -> b.bucket(bucket).key("stream-test.txt"))
 			.build();
+		
+		PresignedUrl streamPresignedUrl = getStreamRequest.presignedUrl(Duration.ofMinutes(5));
 		String streamResponse = restClient.get()
-			.uri(getStreamRequest.uri())
-			.headers(getStreamRequest.headers())
+			.uri(streamPresignedUrl.url())
+			//.headers(streamPresignedUrl.headers())
 			.retrieve()
 			.body(String.class);
 		System.out.println("Stream Response: " + streamResponse);
