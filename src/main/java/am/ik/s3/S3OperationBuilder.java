@@ -48,6 +48,67 @@ public class S3OperationBuilder {
 	}
 
 	/**
+	 * Creates a base S3Request builder with common configuration.
+	 * @param method The HTTP method
+	 * @param pathFunction The path function for bucket/key configuration
+	 * @return A configured S3Request builder
+	 */
+	private S3RequestBuilders.Optionals prepareRequestBuilder(HttpMethod method,
+			Function<S3PathBuilder, S3PathBuilder> pathFunction) {
+		return s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(method)
+			.path(pathFunction);
+	}
+
+	/**
+	 * Prepares a base S3Request with common configuration.
+	 * @param method The HTTP method
+	 * @param pathFunction The path function for bucket/key configuration
+	 * @return A configured S3Request
+	 */
+	private S3Request prepareRequest(HttpMethod method, Function<S3PathBuilder, S3PathBuilder> pathFunction) {
+		return prepareRequestBuilder(method, pathFunction).build();
+	}
+
+	/**
+	 * Executes a GET request and returns the response body.
+	 * @param request The S3Request to execute
+	 * @param responseType The expected response type
+	 * @return The response body
+	 */
+	private <T> T executeGetRequest(S3Request request, Class<T> responseType) {
+		return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(responseType);
+	}
+
+	/**
+	 * Executes a PUT request without a body.
+	 * @param request The S3Request to execute
+	 */
+	private void executePutRequest(S3Request request) {
+		restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+	}
+
+	/**
+	 * Executes a PUT request with a body.
+	 * @param request The S3Request to execute
+	 * @param body The request body
+	 */
+	private void executePutRequest(S3Request request, Object body) {
+		restClient.put().uri(request.uri()).headers(request.headers()).body(body).retrieve().toBodilessEntity();
+	}
+
+	/**
+	 * Executes a DELETE request.
+	 * @param request The S3Request to execute
+	 */
+	private void executeDeleteRequest(S3Request request) {
+		restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+	}
+
+	/**
 	 * Creates a bucket operation builder.
 	 * @param bucketName The name of the bucket
 	 * @return A new BucketOperationBuilder instance
@@ -61,15 +122,8 @@ public class S3OperationBuilder {
 	 * @return ListBucketsResult containing all buckets
 	 */
 	public ListBucketsResult listBuckets() {
-		S3Request request = s3Request().endpoint(endpoint)
-			.region(region)
-			.accessKeyId(accessKeyId)
-			.secretAccessKey(secretAccessKey)
-			.method(HttpMethod.GET)
-			.path(Function.identity())
-			.build();
-
-		return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(ListBucketsResult.class);
+		S3Request request = prepareRequest(HttpMethod.GET, Function.identity());
+		return executeGetRequest(request, ListBucketsResult.class);
 	}
 
 	/**
@@ -87,30 +141,16 @@ public class S3OperationBuilder {
 		 * Creates the bucket.
 		 */
 		public void create() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName))
-				.build();
-
-			restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+			S3Request request = prepareRequest(HttpMethod.PUT, b -> b.bucket(bucketName));
+			executePutRequest(request);
 		}
 
 		/**
 		 * Deletes the bucket.
 		 */
 		public void delete() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.DELETE)
-				.path(b -> b.bucket(bucketName))
-				.build();
-
-			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+			S3Request request = prepareRequest(HttpMethod.DELETE, b -> b.bucket(bucketName));
+			executeDeleteRequest(request);
 		}
 
 		/**
@@ -118,19 +158,8 @@ public class S3OperationBuilder {
 		 * @return ListBucketResult containing the objects in the bucket
 		 */
 		public ListBucketResult listObjects() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName))
-				.build();
-
-			return restClient.get()
-				.uri(request.uri())
-				.headers(request.headers())
-				.retrieve()
-				.body(ListBucketResult.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName));
+			return executeGetRequest(request, ListBucketResult.class);
 		}
 
 		/**
@@ -139,20 +168,8 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public ListVersionsResult listVersions() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName))
-				.build()
-				.listVersions();
-
-			return restClient.get()
-				.uri(request.uri())
-				.headers(request.headers())
-				.retrieve()
-				.body(ListVersionsResult.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName)).listVersions();
+			return executeGetRequest(request, ListVersionsResult.class);
 		}
 
 		/**
@@ -166,20 +183,9 @@ public class S3OperationBuilder {
 		 */
 		public ListVersionsResult listVersions(String prefix, String keyMarker, String versionIdMarker,
 				Integer maxKeys) {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName))
-				.build()
-				.listVersions(prefix, keyMarker, versionIdMarker, maxKeys);
-
-			return restClient.get()
-				.uri(request.uri())
-				.headers(request.headers())
-				.retrieve()
-				.body(ListVersionsResult.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName)).listVersions(prefix,
+					keyMarker, versionIdMarker, maxKeys);
+			return executeGetRequest(request, ListVersionsResult.class);
 		}
 
 		/**
@@ -205,22 +211,11 @@ public class S3OperationBuilder {
 		 */
 		public void setVersioningConfiguration(VersioningConfiguration versioningConfiguration) {
 			String versioningConfigurationXml = versioningConfiguration.toXml();
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName))
+			S3Request request = prepareRequestBuilder(HttpMethod.PUT, b -> b.bucket(bucketName))
 				.canonicalQueryString("versioning=")
 				.content(S3Content.of(versioningConfigurationXml, MediaType.APPLICATION_XML))
 				.build();
-
-			restClient.put()
-				.uri(request.uri())
-				.headers(request.headers())
-				.body(versioningConfigurationXml)
-				.retrieve()
-				.toBodilessEntity();
+			executePutRequest(request, versioningConfigurationXml);
 		}
 
 		/**
@@ -229,20 +224,10 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public VersioningConfiguration getVersioningConfiguration() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName))
+			S3Request request = prepareRequestBuilder(HttpMethod.GET, b -> b.bucket(bucketName))
 				.canonicalQueryString("versioning=")
 				.build();
-
-			return restClient.get()
-				.uri(request.uri())
-				.headers(request.headers())
-				.retrieve()
-				.body(VersioningConfiguration.class);
+			return executeGetRequest(request, VersioningConfiguration.class);
 		}
 
 		/**
@@ -284,15 +269,10 @@ public class S3OperationBuilder {
 		 * @param mediaType The media type of the content
 		 */
 		public void put(String content, MediaType mediaType) {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName).key(objectKey))
+			S3Request request = prepareRequestBuilder(HttpMethod.PUT, b -> b.bucket(bucketName).key(objectKey))
 				.content(S3Content.of(content, mediaType))
 				.build();
-			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
+			executePutRequest(request, content);
 		}
 
 		/**
@@ -309,15 +289,10 @@ public class S3OperationBuilder {
 		 * @param mediaType The media type of the content
 		 */
 		public void put(byte[] content, MediaType mediaType) {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName).key(objectKey))
+			S3Request request = prepareRequestBuilder(HttpMethod.PUT, b -> b.bucket(bucketName).key(objectKey))
 				.content(S3Content.of(content, mediaType))
 				.build();
-			restClient.put().uri(request.uri()).headers(request.headers()).body(content).retrieve().toBodilessEntity();
+			executePutRequest(request, content);
 		}
 
 		/**
@@ -337,16 +312,10 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public void putResource(Resource resource, MediaType mediaType) {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName).key(objectKey))
+			S3Request request = prepareRequestBuilder(HttpMethod.PUT, b -> b.bucket(bucketName).key(objectKey))
 				.content(S3Content.ofResource(resource, mediaType))
 				.build();
-
-			restClient.put().uri(request.uri()).headers(request.headers()).body(resource).retrieve().toBodilessEntity();
+			executePutRequest(request, resource);
 		}
 
 		/**
@@ -354,14 +323,8 @@ public class S3OperationBuilder {
 		 * @return The object content as a string
 		 */
 		public String getAsString() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(String.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName).key(objectKey));
+			return executeGetRequest(request, String.class);
 		}
 
 		/**
@@ -369,14 +332,8 @@ public class S3OperationBuilder {
 		 * @return The object content as a byte array
 		 */
 		public byte[] getAsBytes() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(byte[].class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName).key(objectKey));
+			return executeGetRequest(request, byte[].class);
 		}
 
 		/**
@@ -385,28 +342,16 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public Resource getAsResource() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(Resource.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName).key(objectKey));
+			return executeGetRequest(request, Resource.class);
 		}
 
 		/**
 		 * Deletes the object.
 		 */
 		public void delete() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.DELETE)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+			S3Request request = prepareRequest(HttpMethod.DELETE, b -> b.bucket(bucketName).key(objectKey));
+			executeDeleteRequest(request);
 		}
 
 		/**
@@ -424,13 +369,7 @@ public class S3OperationBuilder {
 			if (!(method == HttpMethod.GET || method == HttpMethod.PUT || method == HttpMethod.DELETE)) {
 				throw new IllegalArgumentException("Method not supported: " + method);
 			}
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(method)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
+			S3Request request = prepareRequest(method, b -> b.bucket(bucketName).key(objectKey));
 			return request.presignedUrl(expiration, additionalHeaders);
 		}
 
@@ -476,13 +415,7 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public PresignedPostForm.Generator presignedPostForm(java.time.Duration expiration) {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(org.springframework.http.HttpMethod.POST)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
+			S3Request request = prepareRequest(HttpMethod.POST, b -> b.bucket(bucketName).key(objectKey));
 			return request.presignedPostForm(expiration);
 		}
 
@@ -533,20 +466,9 @@ public class S3OperationBuilder {
 		 * @since 0.3.0
 		 */
 		public ListVersionsResult listVersions() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName))
-				.build()
-				.listVersions(objectKey, null, null, null);
-
-			return restClient.get()
-				.uri(request.uri())
-				.headers(request.headers())
-				.retrieve()
-				.body(ListVersionsResult.class);
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName)).listVersions(objectKey, null,
+					null, null);
+			return executeGetRequest(request, ListVersionsResult.class);
 		}
 
 	}
@@ -575,12 +497,7 @@ public class S3OperationBuilder {
 		 * @return this builder
 		 */
 		public MultipartUploadBuilder partSize(org.springframework.util.unit.DataSize partSize) {
-			this.configuration = MultipartUploadConfiguration.builder()
-				.partSize(partSize)
-				.maxConcurrentUploads(configuration.maxConcurrentUploads())
-				.enableProgressTracking(configuration.enableProgressTracking())
-				.executor(configuration.executor())
-				.build();
+			this.configuration = updateConfiguration(builder -> builder.partSize(partSize));
 			return this;
 		}
 
@@ -590,12 +507,7 @@ public class S3OperationBuilder {
 		 * @return this builder
 		 */
 		public MultipartUploadBuilder maxConcurrentUploads(int maxConcurrentUploads) {
-			this.configuration = MultipartUploadConfiguration.builder()
-				.partSize(configuration.partSize())
-				.maxConcurrentUploads(maxConcurrentUploads)
-				.enableProgressTracking(configuration.enableProgressTracking())
-				.executor(configuration.executor())
-				.build();
+			this.configuration = updateConfiguration(builder -> builder.maxConcurrentUploads(maxConcurrentUploads));
 			return this;
 		}
 
@@ -615,12 +527,7 @@ public class S3OperationBuilder {
 		 * @return this builder
 		 */
 		public MultipartUploadBuilder executor(java.util.concurrent.Executor executor) {
-			this.configuration = MultipartUploadConfiguration.builder()
-				.partSize(configuration.partSize())
-				.maxConcurrentUploads(configuration.maxConcurrentUploads())
-				.enableProgressTracking(configuration.enableProgressTracking())
-				.executor(executor)
-				.build();
+			this.configuration = updateConfiguration(builder -> builder.executor(executor));
 			return this;
 		}
 
@@ -633,6 +540,22 @@ public class S3OperationBuilder {
 			this.configuration = configuration != null ? configuration
 					: MultipartUploadConfiguration.defaultConfiguration();
 			return this;
+		}
+
+		/**
+		 * Updates the current configuration by applying the given function to a builder.
+		 * @param builderFunction the function to apply to the configuration builder
+		 * @return the updated configuration
+		 */
+		private MultipartUploadConfiguration updateConfiguration(
+				Function<MultipartUploadConfiguration.Builder, MultipartUploadConfiguration.Builder> builderFunction) {
+			return builderFunction
+				.apply(MultipartUploadConfiguration.builder()
+					.partSize(configuration.partSize())
+					.maxConcurrentUploads(configuration.maxConcurrentUploads())
+					.enableProgressTracking(configuration.enableProgressTracking())
+					.executor(configuration.executor()))
+				.build();
 		}
 
 		/**
@@ -672,14 +595,7 @@ public class S3OperationBuilder {
 		}
 
 		private MultipartUpload createMultipartUpload() {
-			S3Request baseRequest = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-
+			S3Request baseRequest = prepareRequest(HttpMethod.PUT, b -> b.bucket(bucketName).key(objectKey));
 			return new MultipartUpload(restClient, baseRequest, configuration, progressCallback);
 		}
 
@@ -710,22 +626,8 @@ public class S3OperationBuilder {
 		 * @return The partial object content as a Spring Resource
 		 */
 		public Resource getAsResource() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-
-			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
-					: request.withRangeFrom(rangeStart);
-
-			return restClient.get()
-				.uri(rangeRequest.uri())
-				.headers(rangeRequest.headers())
-				.retrieve()
-				.body(Resource.class);
+			S3Request rangeRequest = createRangeRequest();
+			return executeGetRequest(rangeRequest, Resource.class);
 		}
 
 		/**
@@ -733,22 +635,8 @@ public class S3OperationBuilder {
 		 * @return The partial object content as a byte array
 		 */
 		public byte[] getAsBytes() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
-
-			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
-					: request.withRangeFrom(rangeStart);
-
-			return restClient.get()
-				.uri(rangeRequest.uri())
-				.headers(rangeRequest.headers())
-				.retrieve()
-				.body(byte[].class);
+			S3Request rangeRequest = createRangeRequest();
+			return executeGetRequest(rangeRequest, byte[].class);
 		}
 
 		/**
@@ -756,22 +644,17 @@ public class S3OperationBuilder {
 		 * @return The partial object content as a string
 		 */
 		public String getAsString() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build();
+			S3Request rangeRequest = createRangeRequest();
+			return executeGetRequest(rangeRequest, String.class);
+		}
 
-			S3Request rangeRequest = rangeEnd != null ? request.withRange(rangeStart, rangeEnd)
-					: request.withRangeFrom(rangeStart);
-
-			return restClient.get()
-				.uri(rangeRequest.uri())
-				.headers(rangeRequest.headers())
-				.retrieve()
-				.body(String.class);
+		/**
+		 * Creates a range request for partial content retrieval.
+		 * @return A configured S3Request with range headers
+		 */
+		private S3Request createRangeRequest() {
+			S3Request request = prepareRequest(HttpMethod.GET, b -> b.bucket(bucketName).key(objectKey));
+			return rangeEnd != null ? request.withRange(rangeStart, rangeEnd) : request.withRangeFrom(rangeStart);
 		}
 
 	}
@@ -800,16 +683,8 @@ public class S3OperationBuilder {
 		 * @return The versioned object content as a string
 		 */
 		public String getAsString() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build()
-				.withVersionId(versionId);
-
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(String.class);
+			S3Request request = createVersionedRequest(HttpMethod.GET);
+			return executeGetRequest(request, String.class);
 		}
 
 		/**
@@ -817,16 +692,8 @@ public class S3OperationBuilder {
 		 * @return The versioned object content as a byte array
 		 */
 		public byte[] getAsBytes() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build()
-				.withVersionId(versionId);
-
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(byte[].class);
+			S3Request request = createVersionedRequest(HttpMethod.GET);
+			return executeGetRequest(request, byte[].class);
 		}
 
 		/**
@@ -834,32 +701,16 @@ public class S3OperationBuilder {
 		 * @return The versioned object content as a Spring Resource
 		 */
 		public Resource getAsResource() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.GET)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build()
-				.withVersionId(versionId);
-
-			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(Resource.class);
+			S3Request request = createVersionedRequest(HttpMethod.GET);
+			return executeGetRequest(request, Resource.class);
 		}
 
 		/**
 		 * Deletes a specific version of the object.
 		 */
 		public void delete() {
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.DELETE)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build()
-				.deleteVersion(versionId);
-
-			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+			S3Request request = createVersionedRequest(HttpMethod.DELETE).deleteVersion(versionId);
+			executeDeleteRequest(request);
 		}
 
 		/**
@@ -871,16 +722,11 @@ public class S3OperationBuilder {
 			String copySource = "/" + bucketName + "/" + objectKey + "?versionId=" + versionId;
 			Map<String, String> additionalHeaders = Map.of("x-amz-copy-source", copySource);
 
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(destinationBucket).key(destinationKey))
+			S3Request request = prepareRequestBuilder(HttpMethod.PUT,
+					b -> b.bucket(destinationBucket).key(destinationKey))
 				.additionalHeaders(additionalHeaders)
 				.build();
-
-			restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+			executePutRequest(request);
 		}
 
 		/**
@@ -895,16 +741,18 @@ public class S3OperationBuilder {
 				throw new IllegalArgumentException("Method not supported for versioned objects: " + method);
 			}
 
-			S3Request request = s3Request().endpoint(endpoint)
-				.region(region)
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(method)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.build()
-				.withVersionId(versionId);
+			S3Request request = createVersionedRequest(method);
 
 			return request.presignedUrl(expiration);
+		}
+
+		/**
+		 * Creates a versioned request for this object.
+		 * @param method the HTTP method
+		 * @return A configured S3Request with version ID
+		 */
+		private S3Request createVersionedRequest(HttpMethod method) {
+			return prepareRequest(method, b -> b.bucket(bucketName).key(objectKey)).withVersionId(versionId);
 		}
 
 	}
