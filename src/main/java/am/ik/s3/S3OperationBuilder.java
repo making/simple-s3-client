@@ -1,6 +1,5 @@
 package am.ik.s3;
 
-import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -132,6 +131,118 @@ public class S3OperationBuilder {
 				.headers(request.headers())
 				.retrieve()
 				.body(ListBucketResult.class);
+		}
+
+		/**
+		 * Lists object versions in the bucket.
+		 * @return ListVersionsResult containing the object versions in the bucket
+		 * @since 0.3.0
+		 */
+		public ListVersionsResult listVersions() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName))
+				.build()
+				.listVersions();
+
+			return restClient.get()
+				.uri(request.uri())
+				.headers(request.headers())
+				.retrieve()
+				.body(ListVersionsResult.class);
+		}
+
+		/**
+		 * Lists object versions in the bucket with parameters.
+		 * @param prefix the prefix to filter objects
+		 * @param keyMarker the key marker for pagination
+		 * @param versionIdMarker the version ID marker for pagination
+		 * @param maxKeys the maximum number of keys to return
+		 * @return ListVersionsResult containing the object versions in the bucket
+		 * @since 0.3.0
+		 */
+		public ListVersionsResult listVersions(String prefix, String keyMarker, String versionIdMarker,
+				Integer maxKeys) {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName))
+				.build()
+				.listVersions(prefix, keyMarker, versionIdMarker, maxKeys);
+
+			return restClient.get()
+				.uri(request.uri())
+				.headers(request.headers())
+				.retrieve()
+				.body(ListVersionsResult.class);
+		}
+
+		/**
+		 * Enables versioning for the bucket.
+		 * @since 0.3.0
+		 */
+		public void enableVersioning() {
+			setVersioningConfiguration(VersioningConfiguration.enabled());
+		}
+
+		/**
+		 * Suspends versioning for the bucket.
+		 * @since 0.3.0
+		 */
+		public void suspendVersioning() {
+			setVersioningConfiguration(VersioningConfiguration.suspended());
+		}
+
+		/**
+		 * Sets the versioning configuration for the bucket.
+		 * @param versioningConfiguration the versioning configuration to set
+		 * @since 0.3.0
+		 */
+		public void setVersioningConfiguration(VersioningConfiguration versioningConfiguration) {
+			String versioningConfigurationXml = versioningConfiguration.toXml();
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.PUT)
+				.path(b -> b.bucket(bucketName))
+				.canonicalQueryString("versioning=")
+				.content(S3Content.of(versioningConfigurationXml, MediaType.APPLICATION_XML))
+				.build();
+
+			restClient.put()
+				.uri(request.uri())
+				.headers(request.headers())
+				.body(versioningConfigurationXml)
+				.retrieve()
+				.toBodilessEntity();
+		}
+
+		/**
+		 * Gets the versioning configuration for the bucket.
+		 * @return the current versioning configuration
+		 * @since 0.3.0
+		 */
+		public VersioningConfiguration getVersioningConfiguration() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName))
+				.canonicalQueryString("versioning=")
+				.build();
+
+			return restClient.get()
+				.uri(request.uri())
+				.headers(request.headers())
+				.retrieve()
+				.body(VersioningConfiguration.class);
 		}
 
 		/**
@@ -406,6 +517,38 @@ public class S3OperationBuilder {
 			return new RangeRequestBuilder(bucketName, objectKey, rangeStart, null);
 		}
 
+		/**
+		 * Creates a version operation builder for a specific version of this object.
+		 * @param versionId the version ID of the object
+		 * @return a new VersionedObjectOperationBuilder instance
+		 * @since 0.3.0
+		 */
+		public VersionedObjectOperationBuilder version(String versionId) {
+			return new VersionedObjectOperationBuilder(bucketName, objectKey, versionId);
+		}
+
+		/**
+		 * Lists all versions of this object.
+		 * @return ListVersionsResult containing all versions of this object
+		 * @since 0.3.0
+		 */
+		public ListVersionsResult listVersions() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName))
+				.build()
+				.listVersions(objectKey, null, null, null);
+
+			return restClient.get()
+				.uri(request.uri())
+				.headers(request.headers())
+				.retrieve()
+				.body(ListVersionsResult.class);
+		}
+
 	}
 
 	/**
@@ -629,6 +772,139 @@ public class S3OperationBuilder {
 				.headers(rangeRequest.headers())
 				.retrieve()
 				.body(String.class);
+		}
+
+	}
+
+	/**
+	 * Builder class for version-specific object operations.
+	 *
+	 * @since 0.3.0
+	 */
+	public class VersionedObjectOperationBuilder {
+
+		private final String bucketName;
+
+		private final String objectKey;
+
+		private final String versionId;
+
+		private VersionedObjectOperationBuilder(String bucketName, String objectKey, String versionId) {
+			this.bucketName = bucketName;
+			this.objectKey = objectKey;
+			this.versionId = versionId;
+		}
+
+		/**
+		 * Gets (downloads) a specific version of an object as a string.
+		 * @return The versioned object content as a string
+		 */
+		public String getAsString() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withVersionId(versionId);
+
+			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(String.class);
+		}
+
+		/**
+		 * Gets (downloads) a specific version of an object as a byte array.
+		 * @return The versioned object content as a byte array
+		 */
+		public byte[] getAsBytes() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withVersionId(versionId);
+
+			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(byte[].class);
+		}
+
+		/**
+		 * Gets (downloads) a specific version of an object as a Spring Resource.
+		 * @return The versioned object content as a Spring Resource
+		 */
+		public Resource getAsResource() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.GET)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withVersionId(versionId);
+
+			return restClient.get().uri(request.uri()).headers(request.headers()).retrieve().body(Resource.class);
+		}
+
+		/**
+		 * Deletes a specific version of the object.
+		 */
+		public void delete() {
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.DELETE)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.deleteVersion(versionId);
+
+			restClient.delete().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+		}
+
+		/**
+		 * Copies a specific version of this object to a new location.
+		 * @param destinationBucket the destination bucket name
+		 * @param destinationKey the destination object key
+		 */
+		public void copyTo(String destinationBucket, String destinationKey) {
+			String copySource = "/" + bucketName + "/" + objectKey + "?versionId=" + versionId;
+			Map<String, String> additionalHeaders = Map.of("x-amz-copy-source", copySource);
+
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(HttpMethod.PUT)
+				.path(b -> b.bucket(destinationBucket).key(destinationKey))
+				.additionalHeaders(additionalHeaders)
+				.build();
+
+			restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
+		}
+
+		/**
+		 * Generates a presigned URL for this specific version with the specified HTTP
+		 * method.
+		 * @param method the HTTP method (GET or DELETE)
+		 * @param expiration the duration until the URL expires
+		 * @return a PresignedUrl containing the URL and expiration information
+		 */
+		public PresignedUrl presignedUrl(HttpMethod method, java.time.Duration expiration) {
+			if (!(method == HttpMethod.GET || method == HttpMethod.DELETE)) {
+				throw new IllegalArgumentException("Method not supported for versioned objects: " + method);
+			}
+
+			S3Request request = s3Request().endpoint(endpoint)
+				.region(region)
+				.accessKeyId(accessKeyId)
+				.secretAccessKey(secretAccessKey)
+				.method(method)
+				.path(b -> b.bucket(bucketName).key(objectKey))
+				.build()
+				.withVersionId(versionId);
+
+			return request.presignedUrl(expiration);
 		}
 
 	}

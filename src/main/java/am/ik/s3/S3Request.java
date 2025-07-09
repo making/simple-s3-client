@@ -487,6 +487,113 @@ public final class S3Request {
 			.build();
 	}
 
+	/**
+	 * Creates a new S3Request for listing object versions in a bucket.
+	 * @return a new S3Request configured for listing object versions
+	 * @since 0.3.0
+	 */
+	public S3Request listVersions() {
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(this.s3Path.bucket()))
+			.canonicalQueryString("versions=")
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for listing object versions with parameters.
+	 * @param prefix the prefix to filter objects
+	 * @param keyMarker the key marker for pagination
+	 * @param versionIdMarker the version ID marker for pagination
+	 * @param maxKeys the maximum number of keys to return
+	 * @return a new S3Request configured for listing object versions
+	 * @since 0.3.0
+	 */
+	public S3Request listVersions(String prefix, String keyMarker, String versionIdMarker, Integer maxKeys) {
+		Map<String, String> params = new TreeMap<>();
+		params.put("versions", "");
+		if (prefix != null && !prefix.isEmpty()) {
+			params.put("prefix", urlEncode(prefix));
+		}
+		if (keyMarker != null && !keyMarker.isEmpty()) {
+			params.put("key-marker", urlEncode(keyMarker));
+		}
+		if (versionIdMarker != null && !versionIdMarker.isEmpty()) {
+			params.put("version-id-marker", urlEncode(versionIdMarker));
+		}
+		if (maxKeys != null) {
+			params.put("max-keys", String.valueOf(maxKeys));
+		}
+
+		String queryString = params.entrySet()
+			.stream()
+			.map(e -> e.getValue().isEmpty() ? e.getKey() + "=" : e.getKey() + "=" + e.getValue())
+			.collect(Collectors.joining("&"));
+
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(this.s3Path.bucket()))
+			.canonicalQueryString(queryString)
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for getting a specific version of an object.
+	 * @param versionId the version ID of the object
+	 * @return a new S3Request configured for getting a specific version
+	 * @since 0.3.0
+	 */
+	public S3Request withVersionId(String versionId) {
+		if (versionId == null || versionId.isEmpty()) {
+			throw new IllegalArgumentException("Version ID cannot be null or empty");
+		}
+
+		String queryString = this.canonicalQueryString.isEmpty() ? "versionId=" + urlEncode(versionId)
+				: this.canonicalQueryString + "&versionId=" + urlEncode(versionId);
+
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(this.method)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString(queryString)
+			.content(this.content)
+			.additionalHeaders(this.additionalHeaders)
+			.build();
+	}
+
+	/**
+	 * Creates a new S3Request for deleting a specific version of an object.
+	 * @param versionId the version ID of the object to delete
+	 * @return a new S3Request configured for deleting a specific version
+	 * @since 0.3.0
+	 */
+	public S3Request deleteVersion(String versionId) {
+		if (versionId == null || versionId.isEmpty()) {
+			throw new IllegalArgumentException("Version ID cannot be null or empty");
+		}
+
+		return S3RequestBuilder.s3Request()
+			.endpoint(this.endpoint)
+			.region(this.region)
+			.accessKeyId(this.accessKeyId)
+			.secretAccessKey(this.secretAccessKey)
+			.method(HttpMethod.DELETE)
+			.path(b -> b.bucket(this.s3Path.bucket()).key(this.s3Path.key()))
+			.canonicalQueryString("versionId=" + urlEncode(versionId))
+			.build();
+	}
+
 	private String getCredentialScope(AmzDate amzDate) {
 		return "%s/%s/s3/aws4_request".formatted(amzDate.yymmdd(), this.region);
 	}
