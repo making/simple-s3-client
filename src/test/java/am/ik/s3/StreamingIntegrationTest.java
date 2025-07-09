@@ -2,14 +2,15 @@ package am.ik.s3;
 
 import am.ik.spring.logbook.AccessLoggerSink;
 import am.ik.spring.logbook.OpinionatedFilters;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.ResourceHttpMessageConverter;
@@ -77,21 +78,19 @@ class StreamingIntegrationTest {
 
 	@Test
 	void testStreamingGetAndPut() throws IOException {
-		String objectKey = "streaming-test.txt";
-		String content = "Hello, World! This is a streaming test.";
-		byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+		String objectKey = "streaming-test.png";
 
-		// Upload using streaming PUT
-		try (InputStream inputStream = new ByteArrayInputStream(contentBytes)) {
-			s3Client.bucket(bucketName)
-				.object(objectKey)
-				.putStream(inputStream, contentBytes.length, MediaType.TEXT_PLAIN);
-		}
+		// Upload using streaming PUT with ClassPathResource
+		Resource resource = new ClassPathResource("test.png");
+		s3Client.bucket(bucketName).object(objectKey).putResource(resource, MediaType.IMAGE_PNG);
 
 		// Download using streaming GET
-		try (InputStream downloadStream = s3Client.bucket(bucketName).object(objectKey).getAsStream()) {
+		Resource downloadResource = s3Client.bucket(bucketName).object(objectKey).getAsResource();
+		try (InputStream originalStream = resource.getInputStream();
+				InputStream downloadStream = downloadResource.getInputStream()) {
+			byte[] originalBytes = originalStream.readAllBytes();
 			byte[] downloadedBytes = downloadStream.readAllBytes();
-			assertThat(new String(downloadedBytes, StandardCharsets.UTF_8)).isEqualTo(content);
+			assertThat(downloadedBytes).isEqualTo(originalBytes);
 		}
 
 		// Clean up
@@ -107,13 +106,15 @@ class StreamingIntegrationTest {
 		s3Client.bucket(bucketName).object(objectKey).put(content, MediaType.TEXT_PLAIN);
 
 		// Test range request (bytes 10-19)
-		try (InputStream rangeStream = s3Client.bucket(bucketName).object(objectKey).range(10, 19).getAsStream()) {
+		Resource rangeResource = s3Client.bucket(bucketName).object(objectKey).range(10, 19).getAsResource();
+		try (InputStream rangeStream = rangeResource.getInputStream()) {
 			String rangeContent = new String(rangeStream.readAllBytes(), StandardCharsets.UTF_8);
 			assertThat(rangeContent).isEqualTo("ABCDEFGHIJ");
 		}
 
 		// Test range request from position (bytes 30 to end)
-		try (InputStream rangeStream = s3Client.bucket(bucketName).object(objectKey).rangeFrom(30).getAsStream()) {
+		Resource rangeFromResource = s3Client.bucket(bucketName).object(objectKey).rangeFrom(30).getAsResource();
+		try (InputStream rangeStream = rangeFromResource.getInputStream()) {
 			String rangeContent = new String(rangeStream.readAllBytes(), StandardCharsets.UTF_8);
 			assertThat(rangeContent).isEqualTo("UVWXYZ");
 		}
@@ -124,21 +125,19 @@ class StreamingIntegrationTest {
 
 	@Test
 	void testStreamingWithLargerData() throws IOException {
-		String objectKey = "large-streaming-test.dat";
-		byte[] largeData = new byte[1024 * 1024]; // 1MB
-		for (int i = 0; i < largeData.length; i++) {
-			largeData[i] = (byte) (i % 256);
-		}
+		String objectKey = "large-streaming-test.png";
 
-		// Upload using streaming PUT
-		try (InputStream inputStream = new ByteArrayInputStream(largeData)) {
-			s3Client.bucket(bucketName).object(objectKey).putStream(inputStream, largeData.length);
-		}
+		// Upload using streaming PUT with ClassPathResource
+		Resource resource = new ClassPathResource("test.png");
+		s3Client.bucket(bucketName).object(objectKey).putResource(resource);
 
 		// Download using streaming GET and verify
-		try (InputStream downloadStream = s3Client.bucket(bucketName).object(objectKey).getAsStream()) {
+		Resource downloadResource = s3Client.bucket(bucketName).object(objectKey).getAsResource();
+		try (InputStream originalStream = resource.getInputStream();
+				InputStream downloadStream = downloadResource.getInputStream()) {
+			byte[] originalData = originalStream.readAllBytes();
 			byte[] downloadedData = downloadStream.readAllBytes();
-			assertThat(downloadedData).isEqualTo(largeData);
+			assertThat(downloadedData).isEqualTo(originalData);
 		}
 
 		// Clean up
@@ -147,28 +146,25 @@ class StreamingIntegrationTest {
 
 	@Test
 	void testLowLevelStreamingOperations() throws IOException {
-		String objectKey = "low-level-streaming-test.txt";
-		String content = "This is a test for low-level streaming operations with RestClient.";
-		byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+		String objectKey = "low-level-streaming-test.png";
 
-		// Upload using low-level streaming PUT with S3Content.ofStream
-		try (InputStream inputStream = new ByteArrayInputStream(contentBytes)) {
-			S3Request putStreamRequest = s3Request().endpoint(endpoint)
-				.region("us-east-1")
-				.accessKeyId(accessKeyId)
-				.secretAccessKey(secretAccessKey)
-				.method(HttpMethod.PUT)
-				.path(b -> b.bucket(bucketName).key(objectKey))
-				.content(S3Content.ofStream(contentBytes.length, MediaType.TEXT_PLAIN))
-				.build();
+		// Upload using low-level streaming PUT with S3Content.ofResource
+		Resource uploadResource = new ClassPathResource("test.png");
+		S3Request putStreamRequest = s3Request().endpoint(endpoint)
+			.region("us-east-1")
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.PUT)
+			.path(b -> b.bucket(bucketName).key(objectKey))
+			.content(S3Content.ofResource(uploadResource, MediaType.IMAGE_PNG))
+			.build();
 
-			restClient.put()
-				.uri(putStreamRequest.uri())
-				.headers(putStreamRequest.headers())
-				.body(new InputStreamResource(inputStream))
-				.retrieve()
-				.toBodilessEntity();
-		}
+		restClient.put()
+			.uri(putStreamRequest.uri())
+			.headers(putStreamRequest.headers())
+			.body(uploadResource)
+			.retrieve()
+			.toBodilessEntity();
 
 		// Download using low-level streaming GET
 		S3Request getStreamRequest = s3Request().endpoint(endpoint)
@@ -179,18 +175,20 @@ class StreamingIntegrationTest {
 			.path(b -> b.bucket(bucketName).key(objectKey))
 			.build();
 
-		org.springframework.core.io.Resource resource = restClient.get()
+		Resource resource = restClient.get()
 			.uri(getStreamRequest.uri())
 			.headers(getStreamRequest.headers())
 			.retrieve()
-			.body(org.springframework.core.io.Resource.class);
+			.body(Resource.class);
 
-		try (InputStream downloadStream = resource.getInputStream()) {
+		try (InputStream originalStream = uploadResource.getInputStream();
+				InputStream downloadStream = Objects.requireNonNull(resource).getInputStream()) {
+			byte[] originalBytes = originalStream.readAllBytes();
 			byte[] downloadedBytes = downloadStream.readAllBytes();
-			assertThat(new String(downloadedBytes, StandardCharsets.UTF_8)).isEqualTo(content);
+			assertThat(downloadedBytes).isEqualTo(originalBytes);
 		}
 
-		// Test range request with low-level API
+		// Test range request with low-level API (first 100 bytes)
 		S3Request rangeRequest = s3Request().endpoint(endpoint)
 			.region("us-east-1")
 			.accessKeyId(accessKeyId)
@@ -198,20 +196,113 @@ class StreamingIntegrationTest {
 			.method(HttpMethod.GET)
 			.path(b -> b.bucket(bucketName).key(objectKey))
 			.build()
-			.withRange(5, 14);
+			.withRange(0, 99);
 
-		org.springframework.core.io.Resource rangeResource = restClient.get()
+		Resource rangeResource = restClient.get()
 			.uri(rangeRequest.uri())
 			.headers(rangeRequest.headers())
 			.retrieve()
-			.body(org.springframework.core.io.Resource.class);
+			.body(Resource.class);
 
-		try (InputStream rangeStream = rangeResource.getInputStream()) {
-			String rangeContent = new String(rangeStream.readAllBytes(), StandardCharsets.UTF_8);
-			assertThat(rangeContent).isEqualTo("is a test ");
+		try (InputStream originalStream = uploadResource.getInputStream();
+				InputStream rangeStream = Objects.requireNonNull(rangeResource).getInputStream()) {
+			byte[] originalBytes = originalStream.readAllBytes();
+			byte[] rangeBytes = rangeStream.readAllBytes();
+			assertThat(rangeBytes).hasSize(100);
+			assertThat(rangeBytes).isEqualTo(java.util.Arrays.copyOfRange(originalBytes, 0, 100));
 		}
 
 		// Clean up
+		s3Client.bucket(bucketName).object(objectKey).delete();
+	}
+
+	@Test
+	void testStreamingUploadWithPresignedUrlDownload() throws IOException {
+		String objectKey = "presigned-streaming-test.png";
+
+		// Upload using streaming PUT with ClassPathResource
+		Resource uploadResource = new ClassPathResource("test.png");
+		s3Client.bucket(bucketName).object(objectKey).putResource(uploadResource, MediaType.IMAGE_PNG);
+
+		// Generate presigned URL for download
+		PresignedUrl presignedUrl = s3Client.bucket(bucketName)
+			.object(objectKey)
+			.presignedUrl(HttpMethod.GET, java.time.Duration.ofMinutes(5));
+
+		assertThat(presignedUrl.url()).isNotNull();
+		assertThat(presignedUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
+		assertThat(presignedUrl.url().toString()).contains("X-Amz-Signature=");
+
+		// Download using presigned URL with RestClient
+		Resource downloadedResource = restClient.get()
+			.uri(presignedUrl.url())
+			.headers(presignedUrl.headers())
+			.retrieve()
+			.body(Resource.class);
+
+		try (InputStream originalStream = uploadResource.getInputStream();
+				InputStream downloadStream = downloadedResource.getInputStream()) {
+			byte[] originalBytes = originalStream.readAllBytes();
+			byte[] downloadedBytes = downloadStream.readAllBytes();
+			assertThat(downloadedBytes).isEqualTo(originalBytes);
+		}
+
+		// Clean up
+		s3Client.bucket(bucketName).object(objectKey).delete();
+	}
+
+	@Test
+	void testLowLevelStreamingUploadWithPresignedUrlDownload() throws IOException {
+		String objectKey = "low-level-presigned-streaming-test.png";
+
+		// Upload using low-level streaming PUT with S3Content.ofResource
+		Resource uploadResource = new ClassPathResource("test.png");
+		S3Request putStreamRequest = s3Request().endpoint(endpoint)
+			.region("us-east-1")
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.PUT)
+			.path(b -> b.bucket(bucketName).key(objectKey))
+			.content(S3Content.ofResource(uploadResource, MediaType.IMAGE_PNG))
+			.build();
+
+		restClient.put()
+			.uri(putStreamRequest.uri())
+			.headers(putStreamRequest.headers())
+			.body(uploadResource)
+			.retrieve()
+			.toBodilessEntity();
+
+		// Generate presigned URL using low-level API
+		S3Request getRequest = s3Request().endpoint(endpoint)
+			.region("us-east-1")
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(bucketName).key(objectKey))
+			.build();
+
+		PresignedUrl presignedUrl = getRequest.presignedUrl(java.time.Duration.ofMinutes(5));
+
+		assertThat(presignedUrl.url()).isNotNull();
+		assertThat(presignedUrl.url().toString()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
+		assertThat(presignedUrl.url().toString()).contains("X-Amz-Signature=");
+
+		// Download using presigned URL with RestClient
+		Resource downloadedResource = restClient.get()
+			.uri(presignedUrl.url())
+			.headers(presignedUrl.headers())
+			.retrieve()
+			.body(Resource.class);
+
+		try (InputStream originalStream = uploadResource.getInputStream();
+				InputStream downloadStream = downloadedResource.getInputStream()) {
+			byte[] originalBytes = originalStream.readAllBytes();
+			byte[] downloadedBytes = downloadStream.readAllBytes();
+			assertThat(downloadedBytes).isEqualTo(originalBytes);
+		}
+
+		// Clean up using S3Client for convenience
 		s3Client.bucket(bucketName).object(objectKey).delete();
 	}
 

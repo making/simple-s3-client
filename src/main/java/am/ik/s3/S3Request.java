@@ -137,12 +137,6 @@ public final class S3Request {
 					headers.put(HttpHeaders.CONTENT_TYPE, byteArrayContent.mediaType().toString());
 				}
 			}
-			else if (content instanceof S3Content.StreamS3Content streamContent) {
-				headers.put(HttpHeaders.CONTENT_LENGTH, String.valueOf(streamContent.contentLength()));
-				if (streamContent.mediaType() != null) {
-					headers.put(HttpHeaders.CONTENT_TYPE, streamContent.mediaType().toString());
-				}
-			}
 		}
 
 		// Add additional headers to the signing headers

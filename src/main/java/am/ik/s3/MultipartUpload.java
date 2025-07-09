@@ -3,6 +3,9 @@ package am.ik.s3;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClient;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,50 +55,51 @@ public final class MultipartUpload {
 	 * @throws RuntimeException if the upload fails
 	 */
 	public CompleteMultipartUploadResult upload(byte[] data) {
-		return upload(new ByteArrayInputStream(data), data.length);
+		return upload(new ByteArrayResource(data));
 	}
 
 	/**
-	 * Uploads data from an input stream using multipart upload.
-	 * @param inputStream the input stream to read data from
-	 * @param contentLength the total length of the data
+	 * Uploads data from a Spring Resource using multipart upload.
+	 * @param resource the Spring Resource to read data from
 	 * @return the result of the completed multipart upload
 	 * @throws RuntimeException if the upload fails
 	 */
-	public CompleteMultipartUploadResult upload(InputStream inputStream, long contentLength) {
+	public CompleteMultipartUploadResult upload(Resource resource) {
 		try {
-			// Step 1: Initiate multipart upload
-			InitiateMultipartUploadResult initResult = initiateUpload();
-			String uploadId = initResult.uploadId();
+			long contentLength = resource.contentLength();
+			try (InputStream inputStream = resource.getInputStream()) {
+				// Step 1: Initiate multipart upload
+				InitiateMultipartUploadResult initResult = initiateUpload();
+				String uploadId = initResult.uploadId();
 
-			try {
-				// Step 2: Calculate parts and upload them
-				List<CompletedPart> completedParts = uploadParts(inputStream, contentLength, uploadId);
-
-				// Step 3: Complete multipart upload
-				CompleteMultipartUpload completeRequest = new CompleteMultipartUpload(completedParts);
-				CompleteMultipartUploadResult result = completeUpload(uploadId, completeRequest);
-
-				progressCallback.onUploadCompleted(contentLength);
-				return result;
-
-			}
-			catch (Exception e) {
-				// Abort the multipart upload on failure
 				try {
-					abortUpload(uploadId);
-				}
-				catch (Exception abortException) {
-					e.addSuppressed(abortException);
-				}
-				progressCallback.onError(e);
-				throw new RuntimeException("Multipart upload failed", e);
-			}
+					// Step 2: Calculate parts and upload them
+					List<CompletedPart> completedParts = uploadParts(inputStream, contentLength, uploadId);
 
+					// Step 3: Complete multipart upload
+					CompleteMultipartUpload completeRequest = new CompleteMultipartUpload(completedParts);
+					CompleteMultipartUploadResult result = completeUpload(uploadId, completeRequest);
+
+					progressCallback.onUploadCompleted(contentLength);
+					return result;
+
+				}
+				catch (Exception e) {
+					// Abort the multipart upload on failure
+					try {
+						abortUpload(uploadId);
+					}
+					catch (Exception abortException) {
+						e.addSuppressed(abortException);
+					}
+					progressCallback.onError(e);
+					throw new RuntimeException("Multipart upload failed", e);
+				}
+			}
 		}
-		catch (Exception e) {
+		catch (IOException e) {
 			progressCallback.onError(e);
-			throw new RuntimeException("Failed to initiate multipart upload", e);
+			throw new RuntimeException("Failed to read resource", e);
 		}
 	}
 
@@ -114,17 +118,16 @@ public final class MultipartUpload {
 	}
 
 	/**
-	 * Uploads data from an input stream using multipart upload asynchronously.
-	 * @param inputStream the input stream to read data from
-	 * @param contentLength the total length of the data
+	 * Uploads data from a Spring Resource using multipart upload asynchronously.
+	 * @param resource the Spring Resource to read data from
 	 * @return a CompletableFuture that will complete with the upload result
 	 */
-	public CompletableFuture<CompleteMultipartUploadResult> uploadAsync(InputStream inputStream, long contentLength) {
+	public CompletableFuture<CompleteMultipartUploadResult> uploadAsync(Resource resource) {
 		if (configuration.executor() != null) {
-			return CompletableFuture.supplyAsync(() -> upload(inputStream, contentLength), configuration.executor());
+			return CompletableFuture.supplyAsync(() -> upload(resource), configuration.executor());
 		}
 		else {
-			return CompletableFuture.supplyAsync(() -> upload(inputStream, contentLength));
+			return CompletableFuture.supplyAsync(() -> upload(resource));
 		}
 	}
 

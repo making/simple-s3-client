@@ -58,26 +58,26 @@ System.out.println("Content: " + content); // Content: Hello World!
 byte[] imageData = client.bucket("my-bucket").object("test.png").getAsBytes();
 
 // Streaming operations for large files
-try (InputStream largeFileStream = Files.newInputStream(Paths.get("large-file.dat"))) {
-    long fileSize = Files.size(Paths.get("large-file.dat"));
-    client.bucket("my-bucket")
-        .object("large-file.dat")
-        .putStream(largeFileStream, fileSize);
-}
-
-// Download large files as stream
-try (InputStream downloadStream = client.bucket("my-bucket")
+Resource resource = new PathResource("large-file.dat");
+client.bucket("my-bucket")
     .object("large-file.dat")
-    .getAsStream()) {
+    .putResource(resource);
+
+// Download large files as Resource
+Resource downloadResource = client.bucket("my-bucket")
+    .object("large-file.dat")
+    .getAsResource();
+try (InputStream downloadStream = downloadResource.getInputStream()) {
     // Process stream without loading entire file into memory
     Files.copy(downloadStream, Paths.get("downloaded-file.dat"));
 }
 
 // Range requests for partial content
-try (InputStream partialStream = client.bucket("my-bucket")
+Resource partialResource = client.bucket("my-bucket")
     .object("large-file.dat")
     .range(1024, 2048)
-    .getAsStream()) {
+    .getAsResource();
+try (InputStream partialStream = partialResource.getInputStream()) {
     // Download only bytes 1024-2048
     byte[] partialData = partialStream.readAllBytes();
 }
@@ -133,20 +133,18 @@ CompleteMultipartUploadResult uploadResult = client.bucket("my-bucket")
     .upload(largeFileData);
 System.out.println("Large file uploaded: " + uploadResult.etag());
 
-// Multipart upload with InputStream
-try (FileInputStream fileInputStream = new FileInputStream("large-file.dat")) {
-    long fileSize = Files.size(Paths.get("large-file.dat"));
-    CompletableFuture<CompleteMultipartUploadResult> future = client.bucket("my-bucket")
-        .object("async-large-file.dat")
-        .multipartUpload()
-        .partSize(DataSize.ofMegabytes(5))
-        .maxConcurrentUploads(5)
-        .uploadAsync(fileInputStream, fileSize);
-    
-    // Continue with other work...
-    CompleteMultipartUploadResult result = future.get(); // Wait for completion
-    System.out.println("Async upload completed: " + result.etag());
-}
+// Multipart upload with Resource
+Resource resource = new PathResource("large-file.dat");
+CompletableFuture<CompleteMultipartUploadResult> future = client.bucket("my-bucket")
+    .object("async-large-file.dat")
+    .multipartUpload()
+    .partSize(DataSize.ofMegabytes(5))
+    .maxConcurrentUploads(5)
+    .uploadAsync(resource);
+
+// Continue with other work...
+CompleteMultipartUploadResult result = future.get(); // Wait for completion
+System.out.println("Async upload completed: " + result.etag());
 
 // Clean up
 client.bucket("my-bucket").object("hello.txt").delete();
@@ -165,6 +163,8 @@ Make sure the `RestTemplate` has `MappingJackson2XmlHttpMessageConverter` to con
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.PathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -386,7 +386,10 @@ Make sure the `RestClient` has `MappingJackson2XmlHttpMessageConverter` to conve
 ```java
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
+import java.nio.charset.StandardCharsets;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.PathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -478,42 +481,55 @@ S3Request rangeRequest = s3Request().endpoint(endpoint)
 	.path(b -> b.bucket(bucket).key("large-file.dat"))
 	.build()
 	.withRange(1024, 2048);
-	
-try (InputStream rangeStream = restClient.get()
+
+Resource rangeResource = restClient.get()
 	.uri(rangeRequest.uri())
 	.headers(rangeRequest.headers())
 	.retrieve()
-	.body(InputStream.class)) {
+	.body(Resource.class);
+try (InputStream rangeStream = rangeResource.getInputStream()) {
 	// Process partial content stream
 	byte[] partialData = rangeStream.readAllBytes();
 }
 
-// Streaming PUT with InputStream using S3Content.ofStream
-try (InputStream fileStream = Files.newInputStream(Paths.get("large-file.dat"))) {
-	long fileSize = Files.size(Paths.get("large-file.dat"));
-	S3Request putStreamRequest = s3Request().endpoint(endpoint)
-		.region(region)
-		.accessKeyId(accessKeyId)
-		.secretAccessKey(secretAccessKey)
-		.method(HttpMethod.PUT)
-		.path(b -> b.bucket(bucket).key("large-file.dat"))
-		.content(S3Content.ofStream(fileSize, MediaType.APPLICATION_OCTET_STREAM))
-		.build();
-	
-	restClient.put()
-		.uri(putStreamRequest.uri())
-		.headers(putStreamRequest.headers())
-		.body(new org.springframework.core.io.InputStreamResource(fileStream) {
-			@Override
-			public long contentLength() {
-				return fileSize;
-			}
-		})
-		.retrieve()
-		.toBodilessEntity();
-}
+// Streaming PUT with Resource from file using S3Content.ofResource
+Resource fileResource = new PathResource("large-file.dat");
+S3Request putStreamRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.PUT)
+	.path(b -> b.bucket(bucket).key("large-file.dat"))
+	.content(S3Content.ofResource(fileResource, MediaType.APPLICATION_OCTET_STREAM))
+	.build();
 
-// Streaming GET as InputStream
+restClient.put()
+	.uri(putStreamRequest.uri())
+	.headers(putStreamRequest.headers())
+	.body(fileResource)
+	.retrieve()
+	.toBodilessEntity();
+
+// Streaming PUT with Resource from byte array using S3Content.ofResource
+byte[] data = "This is test data for streaming upload".getBytes(StandardCharsets.UTF_8);
+Resource byteResource = new ByteArrayResource(data);
+S3Request putByteStreamRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.PUT)
+	.path(b -> b.bucket(bucket).key("stream-test.txt"))
+	.content(S3Content.ofResource(byteResource, MediaType.TEXT_PLAIN))
+	.build();
+
+restClient.put()
+	.uri(putByteStreamRequest.uri())
+	.headers(putByteStreamRequest.headers())
+	.body(byteResource)
+	.retrieve()
+	.toBodilessEntity();
+
+// Streaming GET as Resource
 S3Request getStreamRequest = s3Request().endpoint(endpoint)
 	.region(region)
 	.accessKeyId(accessKeyId)
@@ -522,11 +538,12 @@ S3Request getStreamRequest = s3Request().endpoint(endpoint)
 	.path(b -> b.bucket(bucket).key("large-file.dat"))
 	.build();
 
-try (InputStream downloadStream = restClient.get()
+Resource downloadResource = restClient.get()
 	.uri(getStreamRequest.uri())
 	.headers(getStreamRequest.headers())
 	.retrieve()
-	.body(InputStream.class)) {
+	.body(Resource.class);
+try (InputStream downloadStream = downloadResource.getInputStream()) {
 	// Process downloaded stream without loading entire file into memory
 	Files.copy(downloadStream, Paths.get("downloaded-file.dat"));
 }
@@ -729,13 +746,11 @@ try {
 - `.put(String content, MediaType mediaType)` - Upload string with specific media type
 - `.put(byte[] content)` - Upload binary content as application/octet-stream
 - `.put(byte[] content, MediaType mediaType)` - Upload binary with specific media type
-- `.putStream(InputStream, long contentLength)` - Upload from InputStream with known length
-- `.putStream(InputStream, long contentLength, MediaType)` - Upload from InputStream with specific media type
+- `.putResource(Resource)` - Upload from Spring Resource
+- `.putResource(Resource, MediaType)` - Upload from Spring Resource with specific media type
 - `.get()` - Download as string
 - `.getAsBytes()` - Download as byte array
-- `.getAsStream()` - Download as InputStream for streaming
-- `.getAsStream(long start, long end)` - Download specific byte range as InputStream
-- `.getAsStreamFrom(long start)` - Download from specific byte position as InputStream
+- `.getAsResource()` - Download as Spring Resource for streaming
 - `.delete()` - Delete the object
 
 #### Presigned URL Operations
@@ -761,15 +776,15 @@ try {
 - `.progressCallback(ProgressCallback)` - Set progress tracking callback
 - `.configuration(MultipartUploadConfiguration)` - Set custom configuration
 - `.upload(byte[])` - Upload data using multipart upload (synchronous)
-- `.upload(InputStream, long)` - Upload from input stream (synchronous)
+- `.upload(Resource)` - Upload from Spring Resource (synchronous)
 - `.uploadAsync(byte[])` - Upload data asynchronously
-- `.uploadAsync(InputStream, long)` - Upload from input stream asynchronously
+- `.uploadAsync(Resource)` - Upload from Spring Resource asynchronously
 
 #### Range Request Operations
 - `.range(long start, long end)` - Create range request builder for partial content retrieval
 - `.rangeFrom(long start)` - Create range request builder from specific position to end
 - Range request builder methods:
-  - `.getAsStream()` - Download partial content as InputStream
+  - `.getAsResource()` - Download partial content as Spring Resource
   - `.getAsBytes()` - Download partial content as byte array
   - `.get()` - Download partial content as string
 

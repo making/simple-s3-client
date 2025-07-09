@@ -2,14 +2,16 @@ package am.ik.s3;
 
 import am.ik.spring.logbook.AccessLoggerSink;
 import am.ik.spring.logbook.OpinionatedFilters;
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClient;
@@ -127,7 +129,7 @@ class MultipartUploadIntegrationTest {
 
 		// Create a 12MB file
 		byte[] data = createTestData(12 * 1024 * 1024);
-		ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
+		ByteArrayResource resource = new ByteArrayResource(data);
 
 		// Perform multipart upload
 		CompleteMultipartUploadResult result = client.bucket(bucketName)
@@ -135,7 +137,7 @@ class MultipartUploadIntegrationTest {
 			.multipartUpload()
 			.partSize(DataSize.ofMegabytes(6))
 			.maxConcurrentUploads(1) // Sequential upload
-			.upload(inputStream, data.length);
+			.upload(resource);
 
 		// Verify the upload
 		assertThat(result).isNotNull();
@@ -307,7 +309,7 @@ class MultipartUploadIntegrationTest {
 		};
 
 		// Perform asynchronous multipart upload
-		java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
+		CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
 			.object(objectKey)
 			.multipartUpload()
 			.partSize(DataSize.ofMegabytes(5))
@@ -350,7 +352,7 @@ class MultipartUploadIntegrationTest {
 		byte[] data = createTestData(8 * 1024 * 1024);
 
 		// Create custom executor
-		java.util.concurrent.ExecutorService customExecutor = java.util.concurrent.Executors.newFixedThreadPool(1);
+		ExecutorService customExecutor = java.util.concurrent.Executors.newFixedThreadPool(1);
 
 		try {
 			// Track progress
@@ -375,7 +377,7 @@ class MultipartUploadIntegrationTest {
 			};
 
 			// Perform asynchronous multipart upload with custom executor
-			java.util.concurrent.CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
+			CompletableFuture<CompleteMultipartUploadResult> future = client.bucket(bucketName)
 				.object(objectKey)
 				.multipartUpload()
 				.partSize(DataSize.ofMegabytes(5))

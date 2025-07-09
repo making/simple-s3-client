@@ -15,18 +15,18 @@
  */
 package am.ik.s3;
 
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 
 /**
  * Represents content to be sent in an S3 request. This is a sealed interface with two
- * implementations: - ByteArrayS3Content for in-memory content - StreamS3Content for
- * streaming content
+ * implementations: - ByteArrayS3Content for in-memory content - ResourceS3Content for
+ * Spring Resource based content
  *
  * @since 0.3.0
  */
-public sealed interface S3Content permits S3Content.ByteArrayS3Content, S3Content.StreamS3Content {
+public sealed interface S3Content permits S3Content.ByteArrayS3Content, S3Content.ResourceS3Content {
 
 	/**
 	 * Creates S3Content from a string.
@@ -49,24 +49,24 @@ public sealed interface S3Content permits S3Content.ByteArrayS3Content, S3Conten
 	}
 
 	/**
-	 * Creates streaming S3Content with content length and media type.
-	 * @param contentLength the length of the content in bytes
+	 * Creates resource-based S3Content with a Spring Resource and media type.
+	 * @param resource the Spring Resource containing the content
 	 * @param mediaType the media type of the content
-	 * @return a new StreamS3Content instance
+	 * @return a new ResourceS3Content instance
 	 * @since 0.3.0
 	 */
-	static S3Content ofStream(long contentLength, MediaType mediaType) {
-		return new StreamS3Content(contentLength, mediaType);
+	static S3Content ofResource(Resource resource, MediaType mediaType) {
+		return new ResourceS3Content(resource, mediaType);
 	}
 
 	/**
-	 * Creates streaming S3Content with content length and default media type.
-	 * @param contentLength the length of the content in bytes
-	 * @return a new StreamS3Content instance
+	 * Creates resource-based S3Content with a Spring Resource and default media type.
+	 * @param resource the Spring Resource containing the content
+	 * @return a new ResourceS3Content instance
 	 * @since 0.3.0
 	 */
-	static S3Content ofStream(long contentLength) {
-		return new StreamS3Content(contentLength, MediaType.APPLICATION_OCTET_STREAM);
+	static S3Content ofResource(Resource resource) {
+		return new ResourceS3Content(resource, MediaType.APPLICATION_OCTET_STREAM);
 	}
 
 	/**
@@ -79,14 +79,14 @@ public sealed interface S3Content permits S3Content.ByteArrayS3Content, S3Conten
 	}
 
 	/**
-	 * Represents streaming content to be sent in an S3 request. This allows for
-	 * memory-efficient uploads of large files.
+	 * Represents resource-based content to be sent in an S3 request. This allows for
+	 * direct use of Spring's Resource abstraction for file uploads.
 	 *
-	 * @param contentLength the length of the content in bytes
+	 * @param resource the Spring Resource containing the content
 	 * @param mediaType the media type of the content
 	 * @since 0.3.0
 	 */
-	record StreamS3Content(long contentLength, MediaType mediaType) implements S3Content {
+	record ResourceS3Content(Resource resource, MediaType mediaType) implements S3Content {
 	}
 
 }
