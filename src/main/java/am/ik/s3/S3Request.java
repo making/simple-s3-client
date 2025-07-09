@@ -232,11 +232,11 @@ public final class S3Request {
 		String credential = getCredential(credentialScope);
 
 		TreeMap<String, String> queryParams = new TreeMap<>();
-		queryParams.put("X-Amz-Algorithm", AWS4_HMAC_SHA256);
-		queryParams.put("X-Amz-Credential", credential);
-		queryParams.put("X-Amz-Date", amzDate.date());
-		queryParams.put("X-Amz-Expires", String.valueOf(expiration.getSeconds()));
-		queryParams.put("X-Amz-SignedHeaders", "host");
+		queryParams.put(AmzHttpHeaders.X_AMZ_ALGORITHM, AWS4_HMAC_SHA256);
+		queryParams.put(AmzHttpHeaders.X_AMZ_CREDENTIAL, credential);
+		queryParams.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
+		queryParams.put(AmzHttpHeaders.X_AMZ_EXPIRES, String.valueOf(expiration.getSeconds()));
+		queryParams.put(AmzHttpHeaders.X_AMZ_SIGNED_HEADERS, "host");
 
 		if (!this.canonicalQueryString.isEmpty()) {
 			String[] pairs = this.canonicalQueryString.split("&");
@@ -258,7 +258,7 @@ public final class S3Request {
 		if (additionalHeaders != null) {
 			headers.putAll(additionalHeaders);
 			String signedHeaders = headers.keySet().stream().map(String::toLowerCase).collect(Collectors.joining(";"));
-			queryParams.put("X-Amz-SignedHeaders", signedHeaders);
+			queryParams.put(AmzHttpHeaders.X_AMZ_SIGNED_HEADERS, signedHeaders);
 		}
 
 		String canonicalQueryStringForSigning = queryParams.entrySet()
@@ -282,7 +282,7 @@ public final class S3Request {
 		String signature = S3RequestSigningUtils.generateSignature(this.secretAccessKey, this.region, stringToSign,
 				amzDate);
 
-		queryParams.put("X-Amz-Signature", signature);
+		queryParams.put(AmzHttpHeaders.X_AMZ_SIGNATURE, signature);
 
 		UriComponentsBuilder builder = UriComponentsBuilder.fromUri(this.endpoint).path(canonicalUri);
 
@@ -313,9 +313,9 @@ public final class S3Request {
 		Map<String, String> fields = new LinkedHashMap<>();
 		fields.put("key", objectKey);
 		fields.put("bucket", bucketName);
-		fields.put("X-Amz-Algorithm", AWS4_HMAC_SHA256);
-		fields.put("X-Amz-Credential", credential);
-		fields.put("X-Amz-Date", amzDate.date());
+		fields.put(AmzHttpHeaders.X_AMZ_ALGORITHM, AWS4_HMAC_SHA256);
+		fields.put(AmzHttpHeaders.X_AMZ_CREDENTIAL, credential);
+		fields.put(AmzHttpHeaders.X_AMZ_DATE, amzDate.date());
 
 		return new PresignedPostForm.Generator(url, expirationTime, stringToSign -> S3RequestSigningUtils
 			.generateSignature(this.secretAccessKey, this.region, stringToSign, amzDate)).addFields(fields);

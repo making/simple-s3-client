@@ -24,6 +24,16 @@ public class AmzHttpHeaders {
 
 	static final String X_AMZ_DATE = "X-Amz-Date";
 
+	static final String X_AMZ_ALGORITHM = "X-Amz-Algorithm";
+
+	static final String X_AMZ_CREDENTIAL = "X-Amz-Credential";
+
+	static final String X_AMZ_EXPIRES = "X-Amz-Expires";
+
+	static final String X_AMZ_SIGNED_HEADERS = "X-Amz-SignedHeaders";
+
+	static final String X_AMZ_SIGNATURE = "X-Amz-Signature";
+
 	/**
 	 * Private constructor to prevent instantiation of this utility class.
 	 */

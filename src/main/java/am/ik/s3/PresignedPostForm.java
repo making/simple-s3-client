@@ -154,7 +154,7 @@ public record PresignedPostForm(URI url, Map<String, String> formFields, Instant
 			String encodedPolicy = Base64.getEncoder().encodeToString(policy.getBytes(StandardCharsets.UTF_8));
 			fields.put("policy", encodedPolicy);
 			String signature = this.signatureGenerator.apply(encodedPolicy);
-			fields.put("X-Amz-Signature", signature);
+			fields.put(AmzHttpHeaders.X_AMZ_SIGNATURE, signature);
 			return new PresignedPostForm(url, Collections.unmodifiableMap(fields), expirationTime,
 					Collections.unmodifiableList(conditions));
 		}
