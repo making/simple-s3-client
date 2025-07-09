@@ -16,6 +16,7 @@
 package am.ik.s3;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ import org.zalando.logbook.Logbook;
 import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
@@ -123,6 +125,40 @@ public class ReadMeRestClient {
 			.body(String.class);
 		System.out.println("Response: " + response); // Response: Hello World!
 
+		// Streaming PUT with Resource from byte array using S3Content.ofResource
+		byte[] data = "This is test data for streaming upload".getBytes(StandardCharsets.UTF_8);
+		Resource byteResource = new ByteArrayResource(data);
+		S3Request putByteStreamRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.PUT)
+			.path(b -> b.bucket(bucket).key("stream-test.txt"))
+			.content(S3Content.ofResource(byteResource, MediaType.TEXT_PLAIN))
+			.build();
+
+		restClient.put()
+			.uri(putByteStreamRequest.uri())
+			.headers(putByteStreamRequest.headers())
+			.body(byteResource)
+			.retrieve()
+			.toBodilessEntity();
+
+		// Verify the uploaded streaming content
+		S3Request getStreamRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.GET)
+			.path(b -> b.bucket(bucket).key("stream-test.txt"))
+			.build();
+		String streamResponse = restClient.get()
+			.uri(getStreamRequest.uri())
+			.headers(getStreamRequest.headers())
+			.retrieve()
+			.body(String.class);
+		System.out.println("Stream Response: " + streamResponse);
+
 		// Generate presigned URL for GET operation
 		S3Request getRequest = s3Request().endpoint(endpoint)
 			.region(region)
@@ -208,6 +244,19 @@ public class ReadMeRestClient {
 		restClient.delete()
 			.uri(deleteObjectRequest.uri())
 			.headers(deleteObjectRequest.headers())
+			.retrieve()
+			.toBodilessEntity();
+
+		S3Request deleteStreamTestRequest = s3Request().endpoint(endpoint)
+			.region(region)
+			.accessKeyId(accessKeyId)
+			.secretAccessKey(secretAccessKey)
+			.method(HttpMethod.DELETE)
+			.path(b -> b.bucket(bucket).key("stream-test.txt"))
+			.build();
+		restClient.delete()
+			.uri(deleteStreamTestRequest.uri())
+			.headers(deleteStreamTestRequest.headers())
 			.retrieve()
 			.toBodilessEntity();
 
