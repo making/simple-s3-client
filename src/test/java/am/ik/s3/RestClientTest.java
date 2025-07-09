@@ -42,7 +42,7 @@ import static org.springframework.http.HttpMethod.PUT;
 @Testcontainers(disabledWithoutDocker = true)
 class RestClientTest {
 
-	DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:0.11.3");
+	DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:3.0.0");
 
 	@Container
 	public LocalStackContainer localstack = new LocalStackContainer(localstackImage)
