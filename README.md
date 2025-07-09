@@ -146,6 +146,63 @@ CompletableFuture<CompleteMultipartUploadResult> future = client.bucket("my-buck
 CompleteMultipartUploadResult result = future.get(); // Wait for completion
 System.out.println("Async upload completed: " + result.etag());
 
+// Bucket versioning configuration
+// Enable versioning for a bucket
+client.bucket("my-bucket").enableVersioning();
+
+// Check versioning status
+VersioningConfiguration config = client.bucket("my-bucket").getVersioningConfiguration();
+System.out.println("Versioning enabled: " + config.isEnabled());
+
+// Suspend versioning
+client.bucket("my-bucket").suspendVersioning();
+
+// Set versioning configuration directly
+client.bucket("my-bucket").setVersioningConfiguration(VersioningConfiguration.enabled());
+
+// Object versioning operations
+// List all versions of an object
+ListVersionsResult versions = client.bucket("my-bucket")
+    .object("hello.txt")
+    .listVersions();
+System.out.println("Found " + versions.versions().size() + " versions");
+
+// Get a specific version
+String versionId = versions.versions().get(0).versionId();
+String versionedContent = client.bucket("my-bucket")
+    .object("hello.txt")
+    .version(versionId)
+    .getAsString();
+
+// Delete a specific version
+client.bucket("my-bucket")
+    .object("hello.txt")
+    .version(versionId)
+    .delete();
+
+// Copy a specific version to a new object
+client.bucket("my-bucket")
+    .object("hello.txt")
+    .version(versionId)
+    .copyTo("my-bucket", "hello-backup.txt");
+
+// Generate presigned URL for a specific version
+PresignedUrl versionUrl = client.bucket("my-bucket")
+    .object("hello.txt")
+    .version(versionId)
+    .presignedUrl(HttpMethod.GET, Duration.ofHours(1));
+
+// List all object versions in a bucket
+ListVersionsResult bucketVersions = client.bucket("my-bucket")
+    .listVersions();
+bucketVersions.versions().forEach(version -> {
+    System.out.println(version.key() + " - " + version.versionId() + 
+        " (Latest: " + version.isLatest() + ")");
+});
+bucketVersions.deleteMarkers().forEach(marker -> {
+    System.out.println(marker.key() + " - DELETE MARKER - " + marker.versionId());
+});
+
 // Clean up
 client.bucket("my-bucket").object("hello.txt").delete();
 client.bucket("my-bucket").object("test.png").delete();
@@ -320,6 +377,46 @@ S3Request verifyRequest = s3Request().endpoint(endpoint)
 	.build();
 String uploadedContent = restTemplate.exchange(verifyRequest.toEntityBuilder().build(), String.class).getBody();
 System.out.println("Uploaded content: " + uploadedContent);
+
+// Object versioning with RestTemplate
+// List object versions
+S3Request listVersionsRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket))
+	.build()
+	.listVersions();
+ListVersionsResult versionsResult = restTemplate
+	.exchange(listVersionsRequest.toEntityBuilder().build(), ListVersionsResult.class)
+	.getBody();
+System.out.println("Found " + versionsResult.versions().size() + " versions");
+
+// Get specific version
+String versionId = versionsResult.versions().get(0).versionId();
+S3Request getVersionRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build()
+	.withVersionId(versionId);
+String versionedContent = restTemplate
+	.exchange(getVersionRequest.toEntityBuilder().build(), String.class)
+	.getBody();
+
+// Delete specific version
+S3Request deleteVersionRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.DELETE)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build()
+	.deleteVersion(versionId);
+restTemplate.exchange(deleteVersionRequest.toEntityBuilder().build(), Void.class);
 
 // Multipart upload example with RestTemplate
 byte[] largeData = new byte[15 * 1024 * 1024]; // 15MB file
@@ -650,6 +747,54 @@ String uploadedContent = restClient.get()
 	.body(String.class);
 System.out.println("Uploaded content: " + uploadedContent);
 
+// Object versioning with RestClient
+// List object versions
+S3Request listVersionsRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket))
+	.build()
+	.listVersions();
+ListVersionsResult versionsResult = restClient.get()
+	.uri(listVersionsRequest.uri())
+	.headers(listVersionsRequest.headers())
+	.retrieve()
+	.body(ListVersionsResult.class);
+System.out.println("Found " + versionsResult.versions().size() + " versions");
+
+// Get specific version
+String versionId = versionsResult.versions().get(0).versionId();
+S3Request getVersionRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.GET)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build()
+	.withVersionId(versionId);
+String versionedContent = restClient.get()
+	.uri(getVersionRequest.uri())
+	.headers(getVersionRequest.headers())
+	.retrieve()
+	.body(String.class);
+
+// Delete specific version
+S3Request deleteVersionRequest = s3Request().endpoint(endpoint)
+	.region(region)
+	.accessKeyId(accessKeyId)
+	.secretAccessKey(secretAccessKey)
+	.method(HttpMethod.DELETE)
+	.path(b -> b.bucket(bucket).key("hello.txt"))
+	.build()
+	.deleteVersion(versionId);
+restClient.delete()
+	.uri(deleteVersionRequest.uri())
+	.headers(deleteVersionRequest.headers())
+	.retrieve()
+	.toBodilessEntity();
+
 // Multipart upload example with RestClient
 byte[] largeData = new byte[15 * 1024 * 1024]; // 15MB file
 Arrays.fill(largeData, (byte) 'A');
@@ -787,6 +932,19 @@ try {
   - `.getAsResource()` - Download partial content as Spring Resource
   - `.getAsBytes()` - Download partial content as byte array
   - `.getAsString()` - Download partial content as string
+
+#### Versioning Operations
+- `.listVersions()` - List all object versions in a bucket
+- `.listVersions(prefix, keyMarker, versionIdMarker, maxKeys)` - List versions with parameters
+- `.object(String).listVersions()` - List all versions of a specific object
+- `.object(String).version(String versionId)` - Select a specific version for operations
+- Version operation builder methods:
+  - `.getAsString()` - Download specific version as string
+  - `.getAsBytes()` - Download specific version as byte array
+  - `.getAsResource()` - Download specific version as Spring Resource
+  - `.delete()` - Delete specific version
+  - `.copyTo(String bucket, String key)` - Copy specific version to new location
+  - `.presignedUrl(HttpMethod, Duration)` - Generate presigned URL for specific version
 
 
 ### When to Use Which API
