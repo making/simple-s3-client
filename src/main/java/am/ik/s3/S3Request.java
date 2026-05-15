@@ -161,7 +161,7 @@ public final class S3Request {
 	 * @return a header consumer
 	 */
 	public Consumer<HttpHeaders> headers() {
-		return headers -> headers.addAll(this.httpHeaders);
+		return headers -> this.httpHeaders.forEach(headers::addAll);
 	}
 
 	/**

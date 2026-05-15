@@ -1,7 +1,5 @@
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -19,9 +17,6 @@ import org.springframework.web.client.RestClient;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.core.WithoutBodyStrategy;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,17 +32,10 @@ class StreamingIntegrationTest {
 
 	private S3Client s3Client;
 
-	private final RestClient restClient = RestClient.builder()
-		.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-			.sink(new AccessLoggerSink())
-			.headerFilter(OpinionatedFilters.headerFilter())
-			.strategy(new WithoutBodyStrategy())
-			.build()))
-		.messageConverters(converters -> {
-			converters.add(new MappingJackson2XmlHttpMessageConverter());
-			converters.add(new ResourceHttpMessageConverter());
-		})
-		.build();
+	private final RestClient restClient = RestClient.builder().messageConverters(converters -> {
+		converters.add(new MappingJackson2XmlHttpMessageConverter());
+		converters.add(new ResourceHttpMessageConverter());
+	}).build();
 
 	private URI endpoint;
 

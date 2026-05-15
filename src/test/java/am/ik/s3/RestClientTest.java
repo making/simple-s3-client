@@ -17,16 +17,12 @@ package am.ik.s3;
 
 import java.util.List;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
@@ -53,10 +49,6 @@ class RestClientTest {
 	@BeforeEach
 	void setup() {
 		this.restClient = RestClient.builder()
-			.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()))
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 			.build();
 	}
@@ -73,7 +65,7 @@ class RestClientTest {
 		String bucketName = "test";
 		{
 			S3Request request = partialS3Request().method(PUT).path(b -> b.bucket(bucketName)).build();
-			this.restClient.put().uri(request.uri()).headers(request.headers()).retrieve();
+			this.restClient.put().uri(request.uri()).headers(request.headers()).retrieve().toBodilessEntity();
 		}
 		{
 			S3Request request = partialS3Request().method(GET).path(b -> b).build();

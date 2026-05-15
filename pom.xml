@@ -6,7 +6,7 @@
 
 	<groupId>am.ik.s3</groupId>
 	<artifactId>simple-s3-client</artifactId>
-	<version>0.3.0-SNAPSHOT</version>
+	<version>0.3.0-nomin-2</version>
 	<name>simple-s3-client</name>
 	<description>A simple S3 Java Client that only uses RestTemplate and Jackson</description>
 
@@ -15,7 +15,7 @@
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<spring-boot.version>3.3.4</spring-boot.version>
+		<spring-boot.version>4.0.6</spring-boot.version>
 	</properties>
 	<licenses>
 		<license>
@@ -71,12 +71,6 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>am.ik.spring.logbook</groupId>
-			<artifactId>access-logger-logbook</artifactId>
-			<version>0.2.0</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
 			<scope>test</scope>
@@ -93,17 +87,12 @@
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>localstack</artifactId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>testcontainers</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
+			<artifactId>testcontainers-localstack</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -112,8 +101,22 @@
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.15.0</version>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>cc.jilt</groupId>
+							<artifactId>jilt</artifactId>
+							<version>1.8.3</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.5.3</version>
+				<version>3.5.5</version>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -121,7 +124,7 @@
 				<configuration>
 					<sourcepath>${project.basedir}/src/main/java;${project.basedir}/target/generated-sources/annotations</sourcepath>
 				</configuration>
-				<version>3.10.1</version>
+				<version>3.12.0</version>
 			</plugin>
 			<plugin>
 				<groupId>io.spring.javaformat</groupId>
@@ -137,19 +140,42 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>
-				<groupId>org.sonatype.central</groupId>
-				<artifactId>central-publishing-maven-plugin</artifactId>
-				<version>0.8.0</version>
-				<extensions>true</extensions>
-				<configuration>
-					<publishingServerId>central</publishingServerId>
-					<autoPublish>true</autoPublish>
-					<waitUntil>published</waitUntil>
-				</configuration>
-			</plugin>
 		</plugins>
 	</build>
+
+	<distributionManagement>
+		<repository>
+			<id>nexus</id>
+			<name>nomin-nexus-releases</name>
+			<url>https://nexus.nomin.mn:8443/repository/maven-releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>nexus</id>
+			<name>nomin-nexus-snapshots</name>
+			<url>https://nexus.nomin.mn:8443/repository/maven-snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
+
+	<profiles>
+		<profile>
+			<id>central</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.sonatype.central</groupId>
+						<artifactId>central-publishing-maven-plugin</artifactId>
+						<version>0.8.0</version>
+						<extensions>true</extensions>
+						<configuration>
+							<publishingServerId>central</publishingServerId>
+							<autoPublish>true</autoPublish>
+							<waitUntil>published</waitUntil>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 	<dependencyManagement>
 		<dependencies>
@@ -157,6 +183,13 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-dependencies</artifactId>
 				<version>${spring-boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>2.0.5</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

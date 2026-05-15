@@ -1,7 +1,5 @@
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Objects;
@@ -18,9 +16,6 @@ import org.springframework.web.client.RestClient;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.core.WithoutBodyStrategy;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,11 +33,6 @@ class MultipartUploadIntegrationTest {
 	private String bucketName;
 
 	private final RestClient restClient = RestClient.builder()
-		.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-			.sink(new AccessLoggerSink())
-			.headerFilter(OpinionatedFilters.headerFilter())
-			.strategy(new WithoutBodyStrategy())
-			.build()))
 		.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 		.build();
 

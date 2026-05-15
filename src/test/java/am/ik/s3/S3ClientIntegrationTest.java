@@ -1,7 +1,5 @@
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -9,8 +7,6 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
 import org.springframework.web.client.RestClient;
@@ -37,10 +33,6 @@ class S3ClientIntegrationTest {
 	@BeforeEach
 	void setUp() {
 		RestClient restClient = RestClient.builder()
-			.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()))
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 			.build();
 

@@ -20,7 +20,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -140,8 +139,8 @@ class PresignedUrlTest {
 		HttpHeaders httpHeaders = new HttpHeaders();
 		presignedUrl.headers().accept(httpHeaders);
 
-		assertThat(httpHeaders).containsEntry("Content-Type", List.of("application/json"));
-		assertThat(httpHeaders).containsEntry("x-amz-meta-test", List.of("value"));
+		assertThat(httpHeaders.get("Content-Type")).containsExactly("application/json");
+		assertThat(httpHeaders.get("x-amz-meta-test")).containsExactly("value");
 	}
 
 }

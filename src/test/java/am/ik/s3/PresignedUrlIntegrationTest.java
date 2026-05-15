@@ -15,8 +15,6 @@
  */
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
@@ -35,8 +33,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,11 +71,8 @@ class PresignedUrlIntegrationTest {
 		client = S3Client.builder().endpoint(endpoint).region("us-east-1").credentials(ACCESS_KEY, SECRET_KEY).build();
 
 		restClient = RestClient.builder()
-			.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()))
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
+			.bufferContent((uri, method) -> true)
 			.build();
 
 		// Create test bucket
@@ -406,11 +399,7 @@ class PresignedUrlIntegrationTest {
 
 	private MultiValueMap<String, Object> createMultipartFormData(Map<String, String> formFields, String fileContent) {
 		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-
-		// Add all form fields
 		formFields.forEach(parts::add);
-
-		// Add file content
 		ByteArrayResource fileResource = new ByteArrayResource(fileContent.getBytes()) {
 			@Override
 			public String getFilename() {
@@ -418,7 +407,6 @@ class PresignedUrlIntegrationTest {
 			}
 		};
 		parts.add("file", fileResource);
-
 		return parts;
 	}
 

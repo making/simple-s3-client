@@ -15,8 +15,6 @@
  */
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -30,23 +28,13 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestTemplate;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 
 public class ReadMeRestClient {
 
 	public static void main(String[] args) {
-		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder().headerFilter(headers -> headers).build()));
 		RestClient restClient = RestClient.builder()
-			.requestInterceptor(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()))
 			.messageConverters(converters -> converters.add(new MappingJackson2XmlHttpMessageConverter()))
 			.build();
 

@@ -19,11 +19,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.UUID;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
-
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -40,11 +35,6 @@ public class ReadMeRestTemplate {
 
 	public static void main(String[] args) {
 		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()));
 
 		URI endpoint = URI.create("https://play.min.io");
 		String region = "us-east-1";

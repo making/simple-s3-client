@@ -17,21 +17,15 @@ package am.ik.s3;
 
 import java.util.List;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
@@ -54,11 +48,6 @@ class RestTemplateTest {
 	@BeforeEach
 	void setup() {
 		this.restTemplate = new RestTemplate();
-		this.restTemplate.getInterceptors()
-			.add(new LogbookClientHttpRequestInterceptor(Logbook.builder()
-				.sink(new AccessLoggerSink())
-				.headerFilter(OpinionatedFilters.headerFilter())
-				.build()));
 	}
 
 	private S3RequestBuilders.Method partialS3Request() {

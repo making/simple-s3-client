@@ -15,8 +15,6 @@
  */
 package am.ik.s3;
 
-import am.ik.spring.logbook.AccessLoggerSink;
-import am.ik.spring.logbook.OpinionatedFilters;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -38,8 +36,6 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.zalando.logbook.Logbook;
-import org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor;
 
 import static am.ik.s3.S3RequestBuilder.s3Request;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,21 +66,12 @@ class VersioningIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		Logbook logbook = Logbook.builder()
-			.sink(new AccessLoggerSink())
-			.headerFilter(OpinionatedFilters.headerFilter())
-			.build();
-
-		restClient = RestClient.builder()
-			.requestInterceptor(new LogbookClientHttpRequestInterceptor(logbook))
-			.messageConverters(converters -> {
-				converters.add(new MappingJackson2XmlHttpMessageConverter());
-				converters.add(new ResourceHttpMessageConverter());
-			})
-			.build();
+		restClient = RestClient.builder().messageConverters(converters -> {
+			converters.add(new MappingJackson2XmlHttpMessageConverter());
+			converters.add(new ResourceHttpMessageConverter());
+		}).build();
 
 		restTemplate = new RestTemplate();
-		restTemplate.setInterceptors(List.of(new LogbookClientHttpRequestInterceptor(logbook)));
 		restTemplate.getMessageConverters().add(new MappingJackson2XmlHttpMessageConverter());
 
 		client = S3Client.builder()
